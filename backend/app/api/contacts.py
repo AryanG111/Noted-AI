@@ -122,3 +122,26 @@ def get_contact_memories(
         "notes": notes,
         "tasks": tasks
     }
+
+@router.delete("/{contact_id}")
+def delete_contact(
+    contact_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    contact = db.query(Contact).filter(Contact.id == contact_id, Contact.user_id == current_user.id).first()
+    if not contact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Contact not found"
+        )
+        
+    # Remove associated relationship links
+    db.query(Relationship).filter(
+        Relationship.user_id == current_user.id,
+        (Relationship.source_id == contact_id) | (Relationship.target_id == contact_id)
+    ).delete(synchronize_session=False)
+    
+    db.delete(contact)
+    db.commit()
+    return {"detail": "Contact deleted successfully"}

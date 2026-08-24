@@ -163,7 +163,7 @@ class IngestionPipelineService:
         db.commit()
         
         # 6. Generate Vector Embeddings & Index in ChromaDB
-        kernel = get_kernel()
+        kernel = get_kernel(provider)
         try:
             # We embed the whole note content
             embeddings = await kernel.generate_embeddings(note.content)

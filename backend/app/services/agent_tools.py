@@ -4,7 +4,7 @@ from uuid import UUID
 import datetime
 from typing import Optional
 
-def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list):
+def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list, provider: Optional[str] = None):
     
     @tool
     async def search_memories(query: str) -> str:
@@ -15,7 +15,7 @@ def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list):
         from backend.app.services.vector_db import vector_db
         from backend.app.kernels import get_kernel
         
-        kernel = get_kernel()
+        kernel = get_kernel(provider)
         try:
             query_embedding = await kernel.generate_embeddings(query)
             results = vector_db.query_notes(

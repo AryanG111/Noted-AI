@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     OLLAMA_MODEL: str = "mistral"
     OLLAMA_EMBED_MODEL: str = "nomic-embed-text"
     
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
     GROQ_MODEL: str = "llama3-8b-8192"
     
     class Config:

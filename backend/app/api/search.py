@@ -90,11 +90,11 @@ async def ask_noted(
     # Track accessed notes for citations
     accessed_notes = []
     
-    # 1. Initialize DB tools
-    tools = get_agent_tools(db, current_user.id, accessed_notes)
-    
-    # 2. Initialize LLM compatibility layer based on provider selection
+    # 1. Initialize LLM provider selection
     provider = (x_active_kernel or settings.ACTIVE_LLM_PROVIDER).lower()
+    
+    # 2. Initialize DB tools
+    tools = get_agent_tools(db, current_user.id, accessed_notes, provider=provider)
     try:
         if provider == "gemini":
             if not settings.GEMINI_API_KEY:
