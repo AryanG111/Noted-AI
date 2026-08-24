@@ -1,0 +1,55 @@
+@startchen
+
+entity User {
+    * id
+    --
+    username
+    email
+    password_hash
+    role
+    created_at
+}
+
+entity Document {
+    * id
+    --
+    title
+    file_path
+    uploaded_by
+    created_at
+}
+
+entity VectorCollection {
+    * id
+    --
+    collection_id
+    created_at
+}
+
+entity ChatMessage {
+    * id
+    --
+    question
+    answer
+    created_at
+}
+
+relationship Uploads {
+}
+
+relationship Owns {
+}
+
+relationship Stores {
+}
+
+User -1- Uploads
+Uploads -N- Document
+
+User -1- Owns
+Owns -N- ChatMessage
+
+Document -1- Stores
+Stores -1- VectorCollection
+
+@endchen

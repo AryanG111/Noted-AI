@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+.env/
+.venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+backend/venv/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+backend/.env
+frontend/.env
+
+# Node & React
+node_modules/
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+.pnp
+.pnp.js
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+coverage/
+.next/
+out/
+
+# Database / Storage
+chroma_db/
+*.sqlite3
+*.db
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
