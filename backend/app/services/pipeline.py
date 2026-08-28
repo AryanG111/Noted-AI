@@ -12,6 +12,39 @@ from backend.app.services.extractors import cognitive_extractor
 from backend.app.services.vector_db import vector_db
 from backend.app.kernels import get_kernel
 
+def update_contact_context(context: Optional[str], old_title: Optional[str], new_title: Optional[str], is_mentioned: bool) -> Optional[str]:
+    if not context:
+        if is_mentioned and new_title:
+            return f"Mentioned in note: '{new_title}'"
+        return context
+
+    lines = context.split('\n')
+    new_lines = []
+    for line in lines:
+        if old_title and f"'{old_title}'" in line:
+            continue
+        if new_title and f"'{new_title}'" in line:
+            continue
+        new_lines.append(line)
+
+    if is_mentioned and new_title:
+        new_lines.append(f"Also mentioned in: '{new_title}'")
+
+    # Clean up prefixes: the first line that starts with "Mentioned in note:" or "Also mentioned in:"
+    # should be "Mentioned in note: ...", and subsequent ones should be "Also mentioned in: ..."
+    first_mention_idx = -1
+    for i, line in enumerate(new_lines):
+        if line.startswith("Mentioned in note:") or line.startswith("Also mentioned in:"):
+            if first_mention_idx == -1:
+                first_mention_idx = i
+                title_part = line.split(":", 1)[1].strip()
+                new_lines[i] = f"Mentioned in note: {title_part}"
+            else:
+                title_part = line.split(":", 1)[1].strip()
+                new_lines[i] = f"Also mentioned in: {title_part}"
+
+    return "\n".join(new_lines) if new_lines else None
+
 class IngestionPipelineService:
     async def process_note(self, db: Session, note_id: UUID, user_id: UUID, provider: Optional[str] = None) -> Note:
         """
@@ -28,11 +61,30 @@ class IngestionPipelineService:
         if not note:
             raise ValueError("Note not found")
             
+        old_title = note.title
+        
+        # Get all contacts previously mentioned in this note
+        old_relations = db.query(Relationship).filter(
+            Relationship.user_id == user_id,
+            Relationship.source_id == note_id,
+            Relationship.target_type == "contact",
+            Relationship.relation_type == "mentions"
+        ).all()
+        old_contact_ids = [rel.target_id for rel in old_relations]
+            
         user = db.query(User).filter(User.id == user_id).first()
         occupation = user.occupation if user else "Software Engineer"
         ai_tone = user.ai_tone if user else "balanced"
             
-        # 2. Cleanup previous extractions (stale tasks/relations) to avoid duplicates on update
+        # 2. LLM Extraction (Run first so failures don't wipe out DB context)
+        extraction = await cognitive_extractor.extract_all(
+            content=note.content,
+            occupation=occupation,
+            ai_tone=ai_tone,
+            provider=provider
+        )
+        
+        # 3. Cleanup previous extractions (stale tasks/relations) to avoid duplicates on update
         db.query(Relationship).filter(
             Relationship.user_id == user_id,
             Relationship.source_id == note_id
@@ -43,14 +95,6 @@ class IngestionPipelineService:
             Task.source_note_id == note_id
         ).delete()
         db.commit()
-
-        # 3. LLM Extraction
-        extraction = await cognitive_extractor.extract_all(
-            content=note.content,
-            occupation=occupation,
-            ai_tone=ai_tone,
-            provider=provider
-        )
         
         note.title = extraction.get("title") or note.title or "Untitled Note"
         note.summary = extraction.get("summary")
@@ -64,42 +108,56 @@ class IngestionPipelineService:
         db.add(note)
         db.commit()
         db.refresh(note)
+        new_title = note.title
         
         # 4. Process Contacts
+        extracted_names = [name.strip() for name in extraction.get("contacts", []) if name.strip()]
+        
+        # Filter out user's own name to avoid self-contacts
+        if user and user.full_name:
+            user_name_lower = user.full_name.lower()
+            user_first_name = user.full_name.split()[0].lower() if user.full_name.split() else ""
+            extracted_names = [
+                name for name in extracted_names
+                if name.lower() != user_name_lower and name.lower() != user_first_name
+            ]
+            
+        extracted_names_lower = [name.lower() for name in extracted_names]
+        
+        # First, find all contacts that were previously mentioned but are no longer mentioned,
+        # and remove the old note reference from their context.
+        for old_contact_id in old_contact_ids:
+            contact = db.query(Contact).filter(Contact.id == old_contact_id).first()
+            if contact and contact.name.lower() not in extracted_names_lower:
+                contact.context = update_contact_context(contact.context, old_title, new_title, is_mentioned=False)
+                db.add(contact)
+        db.commit()
+        
         contact_ids_map = {}
-        for name in extraction.get("contacts", []):
-            name_clean = name.strip()
-            if not name_clean:
-                continue
-                
+        for name in extracted_names:
             # Check if contact already exists for this user
             contact = db.query(Contact).filter(
                 Contact.user_id == user_id,
-                Contact.name.ilike(name_clean)
+                Contact.name.ilike(name)
             ).first()
             
             if not contact:
                 contact = Contact(
                     user_id=user_id,
-                    name=name_clean,
+                    name=name,
                     role="Contact",
-                    context=f"Mentioned in note: '{note.title}'"
+                    context=update_contact_context(None, old_title, new_title, is_mentioned=True)
                 )
                 db.add(contact)
                 db.commit()
                 db.refresh(contact)
             else:
                 contact.last_interaction = datetime.datetime.now()
-                # Append context
-                if contact.context:
-                    if note.title not in contact.context:
-                        contact.context += f"\nAlso mentioned in: '{note.title}'"
-                else:
-                    contact.context = f"Mentioned in note: '{note.title}'"
+                contact.context = update_contact_context(contact.context, old_title, new_title, is_mentioned=True)
                 db.add(contact)
                 db.commit()
                 
-            contact_ids_map[name_clean.lower()] = contact.id
+            contact_ids_map[name.lower()] = contact.id
             
             # Create Relationship: Note -> Contact (mentions)
             rel = Relationship(

@@ -25,6 +25,8 @@ class NoteResponse(NoteBase):
     memory_type: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    error: Optional[str] = None
+    is_processing: Optional[bool] = False
 
     class Config:
         from_attributes = True

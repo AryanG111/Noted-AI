@@ -57,7 +57,7 @@ def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list, provider: 
         return "\n".join(out)
 
     @tool
-    async def create_contact(name: str, role: str, context: str) -> str:
+    async def create_contact(name: str, role: Optional[str] = None, context: Optional[str] = None) -> str:
         """
         Create a new contact in the database.
         Use this when the user asks to add or create a person profile.
@@ -66,6 +66,19 @@ def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list, provider: 
         - role: Professional role or relationship to the user (e.g. Teacher, Developer).
         - context: Brief background description or notes.
         """
+        import json
+        if name.strip().startswith("{") and name.strip().endswith("}"):
+            try:
+                args = json.loads(name)
+                name = args.get("name", name)
+                role = args.get("role", role)
+                context = args.get("context", context)
+            except Exception:
+                pass
+                
+        role_val = role.strip() if role else "Contact"
+        context_val = context.strip() if context else ""
+        
         from backend.app.models.contact import Contact
         existing = db.query(Contact).filter(Contact.user_id == user_id, Contact.name.ilike(name.strip())).first()
         if existing:
@@ -74,8 +87,8 @@ def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list, provider: 
         new_c = Contact(
             user_id=user_id,
             name=name.strip(),
-            role=role.strip(),
-            context=context.strip()
+            role=role_val,
+            context=context_val
         )
         db.add(new_c)
         db.commit()
@@ -91,6 +104,16 @@ def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list, provider: 
         - role: Updated professional role (optional).
         - context: Updated context/background info (optional).
         """
+        import json
+        if contact_id.strip().startswith("{") and contact_id.strip().endswith("}"):
+            try:
+                args = json.loads(contact_id)
+                contact_id = args.get("contact_id", contact_id)
+                role = args.get("role", role)
+                context = args.get("context", context)
+            except Exception:
+                pass
+                
         from backend.app.models.contact import Contact
         try:
             c_uuid = UUID(contact_id.strip())
@@ -155,6 +178,15 @@ def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list, provider: 
         - description: The task description (e.g. Submit assignment to Jayshree).
         - due_date: Optional ISO datetime string (YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS) representing the deadline.
         """
+        import json
+        if description.strip().startswith("{") and description.strip().endswith("}"):
+            try:
+                args = json.loads(description)
+                description = args.get("description", description)
+                due_date = args.get("due_date", due_date)
+            except Exception:
+                pass
+                
         from backend.app.models.task import Task
         due_val = None
         if due_date:
@@ -183,6 +215,16 @@ def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list, provider: 
         - status: Updated status, must be 'pending' or 'done' (optional).
         - due_date: Updated ISO datetime string (optional). Pass 'null' to clear the deadline.
         """
+        import json
+        if task_id.strip().startswith("{") and task_id.strip().endswith("}"):
+            try:
+                args = json.loads(task_id)
+                task_id = args.get("task_id", task_id)
+                status = args.get("status", status)
+                due_date = args.get("due_date", due_date)
+            except Exception:
+                pass
+                
         from backend.app.models.task import Task
         try:
             t_uuid = UUID(task_id.strip())

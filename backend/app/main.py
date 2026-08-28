@@ -13,9 +13,10 @@ from backend.app.core.db import engine, Base
 from backend.app.api import auth, notes, contacts, tasks, timeline, search
 
 print("--- ACTIVE MODEL CONFIG IN MAIN ---")
+print("ACTIVE_LLM_PROVIDER:", settings.ACTIVE_LLM_PROVIDER)
 print("OLLAMA_MODEL:", settings.OLLAMA_MODEL)
+print("GEMINI_MODEL:", settings.GEMINI_MODEL)
 print("-----------------------------------")
-# Env updated to minimax-cloud
 
 
 # Initialize SQL tables on startup (simplifies local development without strictly needing migrations)

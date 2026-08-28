@@ -72,18 +72,9 @@ class CognitiveExtractorService:
                 "tasks": extracted_data.get("tasks", [])
             }
         except Exception as e:
-            # Fallback if LLM extraction fails completely (ensures notes can still be saved)
             import traceback
             print("Cognitive extraction failed traceback:")
             traceback.print_exc()
-            return {
-                "title": "Untitled Note",
-                "summary": "Note saved. Processing error.",
-                "tags": [],
-                "importance": "5",
-                "memory_type": "general",
-                "contacts": [],
-                "tasks": []
-            }
+            raise e
 
 cognitive_extractor = CognitiveExtractorService()

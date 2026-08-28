@@ -2,6 +2,10 @@ import httpx
 import sys
 import os
 
+# Configure stdout encoding to prevent Unicode errors on Windows
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 # Adjust Python search path to import backend correctly
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -75,6 +79,20 @@ async def run_tests():
             note_data = note_res.json()
             note_id = note_data["id"]
             print(f" -> Success! Note Created with ID: {note_id}")
+            
+            # Wait for background task to complete (is_processing == False)
+            print(" -> Ingestion pipeline running in background, polling for completion...")
+            max_attempts = 30
+            for attempt in range(max_attempts):
+                await asyncio.sleep(1.0)
+                note_check_res = await client.get(f"{API_URL}/notes/{note_id}", headers=headers)
+                if note_check_res.status_code == 200:
+                    note_data = note_check_res.json()
+                    if not note_data.get("is_processing"):
+                        break
+            else:
+                print(" -> Warning: Ingestion pipeline did not complete within timeout.")
+                
             print(f"    - Generated Title: {note_data.get('title')}")
             print(f"    - Generated Summary: {note_data.get('summary')}")
             print(f"    - Generated Tags: {note_data.get('tags')}")

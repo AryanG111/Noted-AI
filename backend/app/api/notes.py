@@ -1,15 +1,29 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, status, Header, BackgroundTasks
 from sqlalchemy.orm import Session
 from uuid import UUID
 from typing import List, Optional
 
-from backend.app.core.db import get_db
+from backend.app.core.db import get_db, SessionLocal
 from backend.app.api.auth import get_current_user
 from backend.app.models.user import User
 from backend.app.models.note import Note
 from backend.app.schemas.note import NoteCreate, NoteUpdate, NoteResponse
 from backend.app.services.pipeline import ingestion_pipeline
 from backend.app.services.vector_db import vector_db
+
+# In-memory set to track currently processing notes
+processing_notes = set()
+
+async def run_ingestion_in_background(note_id: UUID, user_id: UUID, provider: Optional[str]):
+    processing_notes.add(note_id)
+    db = SessionLocal()
+    try:
+        await ingestion_pipeline.process_note(db, note_id, user_id, provider=provider)
+    except Exception as e:
+        print(f"Background ingestion failed for note {note_id}: {e}")
+    finally:
+        db.close()
+        processing_notes.discard(note_id)
 
 router = APIRouter(prefix="/notes", tags=["notes"])
 
@@ -19,6 +33,8 @@ def read_notes(
     current_user: User = Depends(get_current_user)
 ):
     notes = db.query(Note).filter(Note.user_id == current_user.id).order_by(Note.created_at.desc()).all()
+    for note in notes:
+        note.is_processing = note.id in processing_notes
     return notes
 
 @router.get("/{note_id}", response_model=NoteResponse)
@@ -33,11 +49,13 @@ def read_note(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Note not found"
         )
+    note.is_processing = note.id in processing_notes
     return note
 
 @router.post("", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
 async def create_note(
     note_in: NoteCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     x_active_kernel: Optional[str] = Header(None)
@@ -52,19 +70,18 @@ async def create_note(
     db.commit()
     db.refresh(note)
     
-    # Process through pipeline
-    try:
-        processed_note = await ingestion_pipeline.process_note(db, note.id, current_user.id, provider=x_active_kernel)
-        return processed_note
-    except Exception as e:
-        # If pipeline processing fails, we still return the note (reliability requirement NFR)
-        print(f"Ingestion pipeline failed: {e}")
-        return note
+    # Schedule background ingestion
+    processing_notes.add(note.id)
+    background_tasks.add_task(run_ingestion_in_background, note.id, current_user.id, x_active_kernel)
+    
+    note.is_processing = True
+    return note
 
 @router.put("/{note_id}", response_model=NoteResponse)
 async def update_note(
     note_id: UUID,
     note_in: NoteUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
     x_active_kernel: Optional[str] = Header(None)
@@ -85,13 +102,12 @@ async def update_note(
     db.commit()
     db.refresh(note)
     
-    # Re-process note
-    try:
-        processed_note = await ingestion_pipeline.process_note(db, note.id, current_user.id, provider=x_active_kernel)
-        return processed_note
-    except Exception as e:
-        print(f"Ingestion pipeline update failed: {e}")
-        return note
+    # Schedule background ingestion
+    processing_notes.add(note.id)
+    background_tasks.add_task(run_ingestion_in_background, note.id, current_user.id, x_active_kernel)
+    
+    note.is_processing = True
+    return note
 
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_note(

@@ -45,7 +45,11 @@ class GeminiAdapter(LLMKernelAdapter):
         
         data = response.json()
         try:
-            return data["candidates"][0]["content"]["parts"][0]["text"]
+            parts = data["candidates"][0]["content"]["parts"]
+            non_thought_parts = [p["text"] for p in parts if not p.get("thought")]
+            if not non_thought_parts:
+                return parts[0]["text"]
+            return "".join(non_thought_parts)
         except (KeyError, IndexError):
             raise RuntimeError(f"Unexpected response structure from Gemini API: {data}")
 
@@ -59,7 +63,8 @@ class GeminiAdapter(LLMKernelAdapter):
             "model": "models/gemini-embedding-2",
             "content": {
                 "parts": [{"text": text}]
-            }
+            },
+            "outputDimensionality": 768
         }
         
         headers = {"Content-Type": "application/json"}
