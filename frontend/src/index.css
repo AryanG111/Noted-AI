@@ -320,3 +320,39 @@ a:hover {
   border-radius: var(--radius-sm);
   font-family: monospace;
 }
+
+/* Spinner Keyframes & Utility class */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinner {
+  animation: spin 0.6s linear infinite;
+  display: inline-block;
+  border-radius: 50%;
+}
+
+/* Button micro-interactions */
+.btn {
+  transition: transform 0.1s ease, background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.btn:hover {
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0) scale(0.96);
+}
+
+.btn:disabled {
+  transform: none;
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+

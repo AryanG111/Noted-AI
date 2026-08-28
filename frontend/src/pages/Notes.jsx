@@ -3,6 +3,9 @@ import { useAuth, API_URL } from '../context/AuthContext';
 import { SparkleDoodle } from '../components/DoodleIllustrations';
 import { Plus, Trash2, Calendar, User, Check, CheckSquare } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { Lottie } from 'lottie-react';
+import loaderAnimation from '../assets/loader.json';
+import emptyAnimation from '../assets/empty.json';
 
 export const Notes = () => {
   const { token, activeKernel } = useAuth();
@@ -13,6 +16,8 @@ export const Notes = () => {
   const [processing, setProcessing] = useState(false);
   const [savingStatus, setSavingStatus] = useState(''); // 'Saving...', 'Remembered', or ''
   const [error, setError] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
   
   const saveTimeoutRef = useRef(null);
 
@@ -20,6 +25,41 @@ export const Notes = () => {
   useEffect(() => {
     fetchNotes();
   }, []);
+
+  // Polling mechanism for background processing
+  useEffect(() => {
+    if (!selectedNote || !selectedNote.is_processing) {
+      setProcessing(false);
+      return;
+    }
+
+    setProcessing(true);
+    
+    // Set up polling interval
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`${API_URL}/notes/${selectedNote.id}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const noteData = await response.json();
+          if (!noteData.is_processing) {
+            // Processing complete!
+            setSelectedNote(noteData);
+            setProcessing(false);
+            clearInterval(interval);
+            
+            // Refresh note list to show updated title/summary/tags
+            fetchNotes(noteData.id);
+          }
+        }
+      } catch (err) {
+        console.error("Error polling note processing state:", err);
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [selectedNote?.id, selectedNote?.is_processing]);
 
   const fetchNotes = async (selectId = null) => {
     try {
@@ -57,6 +97,8 @@ export const Notes = () => {
   };
 
   const createNewNote = async () => {
+    setCreating(true);
+    setProcessing(true);
     try {
       const response = await fetch(`${API_URL}/notes`, {
         method: 'POST',
@@ -70,19 +112,34 @@ export const Notes = () => {
       if (response.ok) {
         const newNote = await response.json();
         await fetchNotes(newNote.id);
+        if (newNote.error) {
+          setError(newNote.error);
+          setProcessing(false);
+        } else {
+          setError('');
+          if (!newNote.is_processing) {
+            setProcessing(false);
+          }
+        }
       } else {
         const err = await response.json().catch(() => ({}));
         setError(err.detail || `Failed to create note (HTTP ${response.status})`);
+        setProcessing(false);
       }
     } catch (error) {
       console.error('Error creating note:', error);
       setError(error.message || "Connection error to server");
+      setProcessing(false);
+    } finally {
+      setCreating(false);
     }
   };
 
   const deleteNote = async (id, e) => {
     e.stopPropagation();
+    if (deletingId) return;
     if (!window.confirm("Are you sure you want to delete this note?")) return;
+    setDeletingId(id);
     try {
       const response = await fetch(`${API_URL}/notes/${id}`, {
         method: 'DELETE',
@@ -94,7 +151,7 @@ export const Notes = () => {
           setTitle('');
           setContent('');
         }
-        fetchNotes();
+        await fetchNotes();
       } else {
         const err = await response.json().catch(() => ({}));
         setError(err.detail || `Failed to delete note (HTTP ${response.status})`);
@@ -102,6 +159,8 @@ export const Notes = () => {
     } catch (error) {
       console.error('Error deleting note:', error);
       setError(error.message || "Connection error to server");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -130,7 +189,17 @@ export const Notes = () => {
           const updated = await response.json();
           // Update selected note with pipeline results
           setSelectedNote(updated);
-          setSavingStatus('Remembered!');
+          if (updated.error) {
+            setError(updated.error);
+            setSavingStatus('Saved (Ingestion Error)');
+            setProcessing(false);
+          } else {
+            setError('');
+            setSavingStatus('Remembered!');
+            if (!updated.is_processing) {
+              setProcessing(false);
+            }
+          }
           // Refresh note list in background
           const listResponse = await fetch(`${API_URL}/notes`, {
             headers: { 'Authorization': `Bearer ${token}` }
@@ -143,13 +212,14 @@ export const Notes = () => {
           const err = await response.json().catch(() => ({}));
           setError(err.detail || `Auto-save failed (HTTP ${response.status})`);
           setSavingStatus('Error saving');
+          setProcessing(false);
         }
       } catch (error) {
         console.error('Error auto-saving note:', error);
         setError(error.message || "Connection error during auto-save");
         setSavingStatus('Error saving');
-      } finally {
         setProcessing(false);
+      } finally {
         // Clear status text after 2 seconds
         setTimeout(() => setSavingStatus(prev => prev === 'Remembered!' ? '' : prev), 2000);
       }
@@ -182,11 +252,37 @@ export const Notes = () => {
         <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border-color)' }}>
           <button 
             onClick={createNewNote}
+            disabled={creating}
             className="btn btn-primary" 
-            style={{ width: '100%' }}
+            style={{ 
+              width: '100%', 
+              opacity: creating ? 0.7 : 1, 
+              cursor: creating ? 'not-allowed' : 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
           >
-            <Plus size={16} />
-            <span>New Note</span>
+            {creating ? (
+              <>
+                <span style={{
+                  width: '12px',
+                  height: '12px',
+                  border: '2px solid white',
+                  borderTopColor: 'transparent',
+                  borderRadius: '50%',
+                  display: 'inline-block',
+                  animation: 'spin 0.6s linear infinite',
+                  marginRight: '0.5rem'
+                }} />
+                <span>Creating...</span>
+              </>
+            ) : (
+              <>
+                <Plus size={16} />
+                <span>New Note</span>
+              </>
+            )}
           </button>
         </div>
         
@@ -243,17 +339,30 @@ export const Notes = () => {
                   </div>
                   <button 
                     onClick={(e) => deleteNote(n.id, e)}
+                    disabled={deletingId !== null}
                     style={{
                       background: 'none',
                       border: 'none',
-                      color: 'var(--text-secondary)',
-                      cursor: 'pointer',
-                      opacity: selectedNote?.id === n.id ? 1 : 0,
-                      transition: 'opacity 0.2s'
+                      color: deletingId === n.id ? 'var(--red-accent)' : 'var(--text-secondary)',
+                      cursor: deletingId !== null ? 'not-allowed' : 'pointer',
+                      opacity: selectedNote?.id === n.id || deletingId === n.id ? 1 : 0,
+                      transition: 'opacity 0.2s',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
                     }}
                     className="delete-btn"
                   >
-                    <Trash2 size={14} />
+                    {deletingId === n.id ? (
+                      <span className="spinner" style={{
+                        width: '12px',
+                        height: '12px',
+                        border: '2px solid var(--red-accent)',
+                        borderTopColor: 'transparent'
+                      }} />
+                    ) : (
+                      <Trash2 size={14} />
+                    )}
                   </button>
                 </div>
               ))}
@@ -356,6 +465,9 @@ export const Notes = () => {
             gap: '1rem',
             backgroundColor: 'var(--warm-bg)'
           }}>
+            <div style={{ width: '150px', height: '150px', marginBottom: '0.5rem' }}>
+              <Lottie src={emptyAnimation.default || emptyAnimation} loop={true} autoplay={true} />
+            </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>Select a note or create a new one to begin.</p>
           </div>
         )}
@@ -382,7 +494,9 @@ export const Notes = () => {
               height: '100%',
               gap: '1rem'
             }}>
-              <SparkleDoodle size={36} className="text-purple" style={{ animation: 'spin 3s linear infinite', color: 'var(--purple-accent)' }} />
+              <div style={{ width: '80px', height: '80px' }}>
+                <Lottie src={loaderAnimation.default || loaderAnimation} loop={true} autoplay={true} />
+              </div>
               <p className="doodle-text" style={{ fontSize: '1.15rem' }}>✦ Remembering this...</p>
             </div>
           ) : (

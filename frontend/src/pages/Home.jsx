@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { Search, Send, FileText, CheckSquare, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Lottie } from 'lottie-react';
+import ReactMarkdown from 'react-markdown';
+import loaderAnimation from '../assets/loader.json';
+import successAnimation from '../assets/success.json';
+import emptyAnimation from '../assets/empty.json';
 
 export const Home = () => {
   const { token, activeKernel, user } = useAuth();
@@ -367,14 +372,10 @@ export const Home = () => {
 
         {/* Dynamic Thinking States */}
         {chatLoading && (
-          <div style={{ marginTop: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-            <span style={{ 
-              width: '6px', 
-              height: '6px', 
-              borderRadius: '50%', 
-              backgroundColor: 'var(--purple-accent)',
-              display: 'inline-block'
-            }} />
+          <div style={{ marginTop: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-secondary)' }}>
+            <div style={{ width: '40px', height: '40px' }}>
+              <Lottie src={loaderAnimation.default || loaderAnimation} loop={true} autoplay={true} />
+            </div>
             <span style={{ fontSize: '0.85rem' }}>{loadingStatus}</span>
           </div>
         )}
@@ -386,9 +387,9 @@ export const Home = () => {
             borderTop: '1px solid var(--border-color)', 
             paddingTop: '1.5rem'
           }}>
-            <p style={{ fontSize: '0.925rem', lineHeight: '1.6', color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
-              {chatResponse}
-            </p>
+            <div style={{ fontSize: '0.925rem', lineHeight: '1.6', color: 'var(--text-primary)' }} className="markdown-content">
+              <ReactMarkdown>{chatResponse}</ReactMarkdown>
+            </div>
 
             {citations.length > 0 && (
               <div style={{ 
@@ -411,10 +412,10 @@ export const Home = () => {
       </div>
 
       {/* 3. Dashboard Data (Flat 3-column layout) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '2.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '2.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '2.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '2.5rem' }}>
         
         {/* Column 1: Today Stats */}
-        <div>
+        <div style={{ minWidth: 0 }}>
           <h3 style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1.25rem' }}>
             Today
           </h3>
@@ -431,12 +432,15 @@ export const Home = () => {
         </div>
 
         {/* Column 2: Recent Memories */}
-        <div>
+        <div style={{ minWidth: 0 }}>
           <h3 style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1.25rem' }}>
             Recent
           </h3>
           {recentNotes.length === 0 ? (
-            <div style={{ padding: '0.25rem 0' }}>
+            <div style={{ padding: '0.25rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+              <div style={{ width: '100px', height: '100px', marginBottom: '0.5rem' }}>
+                <Lottie src={emptyAnimation.default || emptyAnimation} loop={true} autoplay={true} />
+              </div>
               <p style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', margin: '0 0 0.15rem 0' }}>
                 Your memory is quiet.
               </p>
@@ -461,12 +465,15 @@ export const Home = () => {
         </div>
 
         {/* Column 3: Up Next */}
-        <div>
+        <div style={{ minWidth: 0 }}>
           <h3 style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1.25rem' }}>
             Up Next
           </h3>
           {recentTasks.length === 0 ? (
-            <div style={{ padding: '0.25rem 0' }}>
+            <div style={{ padding: '0.25rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+              <div style={{ width: '100px', height: '100px', marginBottom: '0.5rem' }}>
+                <Lottie src={successAnimation.default || successAnimation} loop={false} autoplay={true} />
+              </div>
               <p style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', margin: '0 0 0.15rem 0' }}>
                 Nothing scheduled
               </p>

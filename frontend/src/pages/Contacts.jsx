@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { EmptyContactsDoodle } from '../components/DoodleIllustrations';
-import { User, FileText, CheckSquare, Edit3, Save } from 'lucide-react';
+import { User, FileText, CheckSquare, Edit3, Save, Trash2 } from 'lucide-react';
 
 export const Contacts = () => {
   const { token } = useAuth();
@@ -13,6 +13,8 @@ export const Contacts = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     fetchContacts();
@@ -75,6 +77,7 @@ export const Contacts = () => {
 
   const saveContactUpdates = async () => {
     if (!selectedContact) return;
+    setSaving(true);
     try {
       const response = await fetch(`${API_URL}/contacts/${selectedContact.id}`, {
         method: 'PUT',
@@ -89,7 +92,7 @@ export const Contacts = () => {
         setSelectedContact(updated);
         setIsEditing(false);
         // Refresh contact list in sidebar
-        fetchContacts(updated.id);
+        await fetchContacts(updated.id);
       } else {
         const err = await response.json().catch(() => ({}));
         setError(err.detail || `Failed to update contact (HTTP ${response.status})`);
@@ -97,6 +100,39 @@ export const Contacts = () => {
     } catch (error) {
       console.error('Error updating contact:', error);
       setError(error.message || "Connection error to server");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteContact = async () => {
+    if (!selectedContact) return;
+    if (deleting) return;
+    if (!window.confirm(`Are you sure you want to delete ${selectedContact.name}?`)) return;
+    
+    setDeleting(true);
+    try {
+      const response = await fetch(`${API_URL}/contacts/${selectedContact.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (response.ok) {
+        setSelectedContact(null);
+        // Refresh contact list in sidebar
+        const remaining = contacts.filter(c => c.id !== selectedContact.id);
+        setContacts(remaining);
+        if (remaining.length > 0) {
+          handleSelectContact(remaining[0]);
+        }
+      } else {
+        const err = await response.json().catch(() => ({}));
+        setError(err.detail || `Failed to delete contact (HTTP ${response.status})`);
+      }
+    } catch (error) {
+      console.error('Error deleting contact:', error);
+      setError(error.message || "Connection error to server");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -238,17 +274,65 @@ export const Contacts = () => {
                 </div>
               </div>
 
-              <div>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
                 {isEditing ? (
-                  <button onClick={saveContactUpdates} className="btn btn-primary" style={{ padding: '0.5rem 1rem' }}>
-                    <Save size={14} />
-                    <span>Save</span>
+                  <button 
+                    onClick={saveContactUpdates} 
+                    disabled={saving || deleting} 
+                    className="btn btn-primary" 
+                    style={{ padding: '0.5rem 1rem' }}
+                  >
+                    {saving ? (
+                      <span className="spinner" style={{
+                        width: '12px',
+                        height: '12px',
+                        border: '2px solid white',
+                        borderTopColor: 'transparent',
+                        marginRight: '0.25rem'
+                      }} />
+                    ) : (
+                      <Save size={14} />
+                    )}
+                    <span>{saving ? 'Saving...' : 'Save'}</span>
                   </button>
                 ) : (
-                  <button onClick={() => setIsEditing(true)} className="btn btn-secondary" style={{ padding: '0.5rem 1rem' }}>
-                    <Edit3 size={14} />
-                    <span>Edit Profile</span>
-                  </button>
+                  <>
+                    <button 
+                      onClick={() => setIsEditing(true)} 
+                      disabled={deleting} 
+                      className="btn btn-secondary" 
+                      style={{ padding: '0.5rem 1rem' }}
+                    >
+                      <Edit3 size={14} />
+                      <span>Edit Profile</span>
+                    </button>
+                    <button 
+                      onClick={handleDeleteContact} 
+                      disabled={deleting} 
+                      className="btn" 
+                      style={{ 
+                        padding: '0.5rem 1rem', 
+                        backgroundColor: 'var(--red-accent)', 
+                        color: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center'
+                      }}
+                    >
+                      {deleting ? (
+                        <span className="spinner" style={{
+                          width: '12px',
+                          height: '12px',
+                          border: '2px solid white',
+                          borderTopColor: 'transparent',
+                          marginRight: '0.25rem'
+                        }} />
+                      ) : (
+                        <Trash2 size={14} />
+                      )}
+                      <span>{deleting ? 'Deleting...' : 'Delete'}</span>
+                    </button>
+                  </>
                 )}
               </div>
             </div>

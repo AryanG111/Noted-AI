@@ -37,7 +37,7 @@ export const Graph = () => {
           y: 250 + Math.sin(idx) * 120,
           vx: 0,
           vy: 0,
-          radius: node.type === 'note' ? 12 : node.type === 'contact' ? 10 : 9
+          radius: 18
         }));
         
         setData({ nodes, edges: json.edges });
@@ -62,6 +62,11 @@ export const Graph = () => {
     let animationFrameId;
 
     const runSimulation = () => {
+      const rect = canvas.getBoundingClientRect();
+      if (canvas.width !== Math.floor(rect.width) || canvas.height !== Math.floor(rect.height)) {
+        canvas.width = Math.floor(rect.width);
+        canvas.height = Math.floor(rect.height);
+      }
       const width = canvas.width;
       const height = canvas.height;
       const nodes = [...data.nodes];
@@ -150,9 +155,32 @@ export const Graph = () => {
       // 2. Draw Graph Canvas Frame
       ctx.clearRect(0, 0, width, height);
 
+      // Draw Grid Paper background pattern
+      ctx.save();
+      ctx.strokeStyle = '#F1EFEA'; // Very subtle warm grid color
+      ctx.lineWidth = 0.5;
+      const gridSize = 25;
+      
+      // Draw vertical grid lines
+      for (let x = 0; x < width; x += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      
+      // Draw horizontal grid lines
+      for (let y = 0; y < height; y += gridSize) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+
       // Draw Edges (Solid clean line style)
-      ctx.strokeStyle = 'var(--border-color)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = '#D1D0CA'; // Warm gray line
+      ctx.lineWidth = 1.2;
       
       edges.forEach(edge => {
         const sourceNode = nodes.find(n => n.id === edge.source);
@@ -172,35 +200,74 @@ export const Graph = () => {
         const isSel = selectedNodeRef.current && node.id === selectedNodeRef.current.id;
         if (isSel) {
           ctx.beginPath();
-          ctx.arc(node.x, node.y, node.radius + 6, 0, 2 * Math.PI);
-          ctx.strokeStyle = 'rgba(109, 93, 252, 0.4)';
-          ctx.lineWidth = 2.5;
+          ctx.arc(node.x, node.y, node.radius + 8, 0, 2 * Math.PI);
+          ctx.strokeStyle = 'rgba(109, 93, 252, 0.25)';
+          ctx.lineWidth = 3.5;
           ctx.stroke();
         }
 
+        // Determine colors and emoji based on type
+        let fillStyle = '#F7F7F5';  // --warm-bg
+        let strokeStyle = '#A3A3A3'; // neutral gray
+        let emoji = '❓';
+        
+        if (node.type === 'note') {
+          fillStyle = '#F5F3FF';   // Soft Purple
+          strokeStyle = '#6D5DFC';  // Theme Purple border
+          emoji = '📝';
+        } else if (node.type === 'contact') {
+          fillStyle = '#F0F9FF';   // Soft Blue
+          strokeStyle = '#0284C7';  // Blue border
+          emoji = '👤';
+        } else if (node.type === 'task') {
+          fillStyle = '#ECFDF5';   // Soft Green
+          strokeStyle = '#10B981';  // Green border
+          emoji = '✅';
+        }
+
+        // 1. Draw node background circle with shadow
+        ctx.save();
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.05)';
+        ctx.shadowBlur = 5;
+        ctx.shadowOffsetX = 1;
+        ctx.shadowOffsetY = 2.5;
+
         ctx.beginPath();
         ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
-        
-        // Select fill color based on type
-        if (node.type === 'note') {
-          ctx.fillStyle = 'var(--purple-accent)'; // Premium Purple Accent
-        } else if (node.type === 'contact') {
-          ctx.fillStyle = 'var(--text-primary)'; // Monochrome dark
-        } else {
-          ctx.fillStyle = '#10B981'; // Quiet Green Task
-        }
+        ctx.fillStyle = fillStyle;
         ctx.fill();
+        ctx.restore();
         
-        // Node Border Outline
-        ctx.strokeStyle = '#FFFFFF';
+        // 2. Draw Sketchy/Doodle outline (two slightly offset outlines)
+        ctx.strokeStyle = strokeStyle;
         ctx.lineWidth = 1.5;
+        
+        ctx.beginPath();
+        ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
         ctx.stroke();
 
-        // Node Label Typography (clean & quiet)
-        ctx.fillStyle = 'var(--text-primary)';
-        ctx.font = '500 10px var(--font-sans)';
+        ctx.beginPath();
+        ctx.arc(node.x + 0.8, node.y - 0.5, node.radius - 0.5, 0, 2 * Math.PI);
+        ctx.lineWidth = 1.0;
+        ctx.stroke();
+
+        // 3. Draw centered emoji icon
+        ctx.save();
+        ctx.font = '14px sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(node.label, node.x, node.y + node.radius + 14);
+        ctx.textBaseline = 'middle';
+        ctx.fillText(emoji, node.x, node.y + 1);
+        ctx.restore();
+
+        // 4. Node Label Typography (Kalam hand-drawn look with rich charcoal text)
+        ctx.save();
+        ctx.fillStyle = '#171717'; // Rich Charcoal (--text-primary)
+        ctx.font = '500 12px Kalam, var(--font-doodle)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const label = node.label.length > 20 ? node.label.substring(0, 18) + '...' : node.label;
+        ctx.fillText(label, node.x, node.y + node.radius + 8);
+        ctx.restore();
       });
 
       animationFrameId = requestAnimationFrame(runSimulation);
@@ -314,11 +381,11 @@ export const Graph = () => {
           backgroundColor: 'var(--warm-bg)'
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--purple-accent)' }} />
+            <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#6D5DFC' }} />
             <span>Notes</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-            <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: 'var(--text-primary)' }} />
+            <span style={{ display: 'inline-block', width: '6px', height: '6px', borderRadius: '50%', backgroundColor: '#0284C7' }} />
             <span>Contacts</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
@@ -350,9 +417,9 @@ export const Graph = () => {
           <div style={{ 
             flexGrow: 1, 
             position: 'relative', 
-            border: '1px solid var(--border-color)', 
-            borderRadius: 'var(--radius-sm)',
-            backgroundColor: 'var(--warm-bg)',
+            border: '2px dashed var(--purple-accent)', 
+            borderRadius: 'var(--radius-md)',
+            backgroundColor: '#FAF9F6', // Warm sketchpad color
             overflow: 'hidden'
           }}>
             <canvas
@@ -445,7 +512,7 @@ export const Graph = () => {
                           width: '6px', 
                           height: '6px', 
                           borderRadius: '50%', 
-                          backgroundColor: conn.type === 'note' ? 'var(--purple-accent)' : conn.type === 'contact' ? 'var(--text-primary)' : '#10B981'
+                          backgroundColor: conn.type === 'note' ? '#6D5DFC' : conn.type === 'contact' ? '#0284C7' : '#10B981'
                         }} />
                         <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', flexGrow: 1 }}>
                           {conn.label}
