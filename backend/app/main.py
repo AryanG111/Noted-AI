@@ -9,6 +9,7 @@ if project_root not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.core.config import settings
+from backend.app.core.db import engine, Base
 from sqlalchemy import text
 from backend.app.api import auth, notes, contacts, tasks, timeline, search, admin
 
