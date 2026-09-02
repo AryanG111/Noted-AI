@@ -7,7 +7,7 @@ export const API_URL = import.meta.env.VITE_API_URL || '/api';
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
-  const [activeKernel, setActiveKernel] = useState(localStorage.getItem('activeKernel') || 'ollama');
+  const [activeKernel, setActiveKernel] = useState(localStorage.getItem('activeKernel') || 'gemini');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
