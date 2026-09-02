@@ -13,10 +13,15 @@ class UserCreate(UserBase):
 
 class UserResponse(UserBase):
     id: UUID
+    status: str
+    role: str
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+class UserStatusUpdate(BaseModel):
+    status: str  # approved, rejected, pending
 
 class Token(BaseModel):
     access_token: str

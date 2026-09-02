@@ -13,4 +13,6 @@ class User(Base):
     full_name = Column(String, nullable=True)
     occupation = Column(String, nullable=True)
     ai_tone = Column(String, default="balanced", nullable=False)
+    status = Column(String, default="pending", nullable=False)  # pending, approved, rejected
+    role = Column(String, default="user", nullable=False)        # user, admin
     created_at = Column(DateTime(timezone=True), server_default=func.now())

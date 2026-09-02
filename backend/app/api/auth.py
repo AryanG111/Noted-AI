@@ -31,6 +31,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
+    if user.status != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account is not approved yet. Please wait for an administrator to approve your request."
+        )
     return user
 
 @router.post("/register", response_model=UserResponse)
@@ -42,13 +47,21 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="A user with this email already exists."
         )
+        
+    # Check if this is the very first user in the system
+    user_count = db.query(User).count()
+    initial_role = "admin" if user_count == 0 else "user"
+    initial_status = "approved" if user_count == 0 else "pending"
+
     hashed_password = get_password_hash(user_in.password)
     user = User(
         email=user_in.email,
         hashed_password=hashed_password,
         full_name=user_in.full_name,
         occupation=user_in.occupation,
-        ai_tone=user_in.ai_tone or "balanced"
+        ai_tone=user_in.ai_tone or "balanced",
+        role=initial_role,
+        status=initial_status
     )
     db.add(user)
     db.commit()
@@ -63,6 +76,21 @@ def login_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Ses
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect email or password"
         )
+    if user.status == "pending":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account registration is currently pending administrator approval. Please check back later."
+        )
+    elif user.status == "rejected":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account registration request has been rejected by the administrator."
+        )
+    elif user.status != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account unauthorized."
+        )
     access_token = create_access_token(subject=user.id)
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -74,6 +102,21 @@ def login_json(user_in: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Incorrect email or password"
+        )
+    if user.status == "pending":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account registration is currently pending administrator approval. Please check back later."
+        )
+    elif user.status == "rejected":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account registration request has been rejected by the administrator."
+        )
+    elif user.status != "approved":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account unauthorized."
         )
     access_token = create_access_token(subject=user.id)
     return {"access_token": access_token, "token_type": "bearer"}

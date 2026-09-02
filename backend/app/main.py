@@ -9,8 +9,8 @@ if project_root not in sys.path:
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.app.core.config import settings
-from backend.app.core.db import engine, Base
-from backend.app.api import auth, notes, contacts, tasks, timeline, search
+from sqlalchemy import text
+from backend.app.api import auth, notes, contacts, tasks, timeline, search, admin
 
 print("--- ACTIVE MODEL CONFIG IN MAIN ---")
 print("ACTIVE_LLM_PROVIDER:", settings.ACTIVE_LLM_PROVIDER)
@@ -19,11 +19,21 @@ print("GEMINI_MODEL:", settings.GEMINI_MODEL)
 print("-----------------------------------")
 
 
-# Initialize SQL tables on startup (simplifies local development without strictly needing migrations)
+# Initialize SQL tables and ensure user status/role columns exist
 try:
     Base.metadata.create_all(bind=engine)
+    with engine.connect() as conn:
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'approved'"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR DEFAULT 'user'"))
+        # Ensure existing users are approved so service isn't disrupted
+        conn.execute(text("UPDATE users SET status = 'approved' WHERE status IS NULL OR status = 'pending'"))
+        # Ensure the first user is granted admin if no admin exists
+        admin_exists = conn.execute(text("SELECT 1 FROM users WHERE role = 'admin'")).scalar()
+        if not admin_exists:
+            conn.execute(text("UPDATE users SET role = 'admin' WHERE id = (SELECT id FROM users ORDER BY created_at ASC LIMIT 1)"))
+        conn.commit()
 except Exception as e:
-    print(f"Error creating database tables: {e}")
+    print(f"Error initializing/migrating database tables: {e}")
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -43,6 +53,7 @@ app.add_middleware(
 
 # Register routes
 app.include_router(auth.router, prefix=settings.API_V1_STR)
+app.include_router(admin.router, prefix=settings.API_V1_STR)
 app.include_router(notes.router, prefix=settings.API_V1_STR)
 app.include_router(contacts.router, prefix=settings.API_V1_STR)
 app.include_router(tasks.router, prefix=settings.API_V1_STR)

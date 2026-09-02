@@ -12,7 +12,8 @@ import {
   Sparkles,
   Menu,
   X,
-  Cpu
+  Cpu,
+  ShieldCheck
 } from 'lucide-react';
 
 export const Layout = ({ children }) => {
@@ -227,6 +228,31 @@ export const Layout = ({ children }) => {
               </li>
             </ul>
           </div>
+
+          {user?.role === 'admin' && (
+            <div>
+              <span style={{ 
+                fontSize: '0.7rem', 
+                fontWeight: 600, 
+                letterSpacing: '0.05em', 
+                color: 'var(--purple-accent)',
+                textTransform: 'uppercase',
+                padding: '0 0.75rem',
+                display: 'block',
+                marginBottom: '0.5rem'
+              }}>
+                Administration
+              </span>
+              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                <li className="nav-item">
+                  <NavLink to="/admin" onClick={closeMobileMenu} className={({ isActive }) => isActive ? 'active' : ''}>
+                    <ShieldCheck size={15} />
+                    <span>Users</span>
+                  </NavLink>
+                </li>
+              </ul>
+            </div>
+          )}
         </nav>
 
         {/* Divider */}

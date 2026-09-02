@@ -9,9 +9,10 @@ import { Timeline } from './pages/Timeline';
 import { Contacts } from './pages/Contacts';
 import { Tasks } from './pages/Tasks';
 import { Graph } from './pages/Graph';
+import { Admin } from './pages/Admin';
 
-const ProtectedRoute = ({ children }) => {
-  const { token, loading } = useAuth();
+const ProtectedRoute = ({ children, requireAdmin = false }) => {
+  const { token, user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -33,6 +34,10 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
+  if (requireAdmin && user?.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+
   return <Layout>{children}</Layout>;
 };
 
@@ -46,6 +51,7 @@ function AppRoutes() {
       <Route path="/contacts" element={<ProtectedRoute><Contacts /></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Tasks /></ProtectedRoute>} />
       <Route path="/graph" element={<ProtectedRoute><Graph /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute requireAdmin={true}><Admin /></ProtectedRoute>} />
       {/* Fallback route */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

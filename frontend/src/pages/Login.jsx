@@ -26,8 +26,12 @@ export const Login = () => {
     setLoading(true);
     try {
       if (isRegister) {
-        await register(email, password, fullName, occupation, aiTone);
-        setSuccessMessage('Account created successfully! Please sign in.');
+        const newUser = await register(email, password, fullName, occupation, aiTone);
+        if (newUser && newUser.status === 'pending') {
+          setSuccessMessage('Registration request submitted! Your account is currently pending administrator approval before you can log in.');
+        } else {
+          setSuccessMessage('Account created and approved! You can now sign in.');
+        }
         setIsRegister(false);
         setPassword(''); // Clear password for security
       } else {

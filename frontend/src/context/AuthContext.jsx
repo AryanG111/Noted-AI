@@ -76,6 +76,7 @@ export const AuthProvider = ({ children }) => {
       const errorData = await response.json();
       throw new Error(errorData.detail || 'Registration failed');
     }
+    return await response.json();
   };
 
   const logout = () => {
