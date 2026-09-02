@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, API_URL } from '../context/AuthContext';
-import { Search, Send, FileText, CheckSquare, Sparkles } from 'lucide-react';
+import { Search, Send, FileText, CheckSquare, Sparkles, RotateCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { Lottie } from 'lottie-react';
+import LottieAnimation from '../components/LottieAnimation';
 import ReactMarkdown from 'react-markdown';
 import loaderAnimation from '../assets/loader.json';
 import successAnimation from '../assets/success.json';
@@ -29,7 +29,20 @@ export const Home = () => {
   const [notesCount, setNotesCount] = useState(0);
   const [recentNotes, setRecentNotes] = useState([]);
   const [allContacts, setAllContacts] = useState([]);
-  const [proactiveReminder, setProactiveReminder] = useState('');
+  const [proactiveReminder, setProactiveReminder] = useState(() => {
+    try {
+      const cacheKey = `noted_proactive_reminder_${user?.id || 'default'}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed?.reminder || '';
+      }
+    } catch {
+      // ignore
+    }
+    return '';
+  });
+  const [refreshingReminder, setRefreshingReminder] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -97,16 +110,29 @@ export const Home = () => {
         setError(err.detail || `Failed to fetch notes (HTTP ${notesRes.status})`);
       }
 
-      // 3. Fetch proactive reminder
-      const reminderRes = await fetch(`${API_URL}/search/proactive`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      if (reminderRes.ok) {
-        const reminderData = await reminderRes.json();
-        setProactiveReminder(reminderData.reminder || '');
-      } else {
-        const err = await reminderRes.json().catch(() => ({}));
-        setError(err.detail || `Failed to fetch reminders (HTTP ${reminderRes.status})`);
+      // 3. Fetch proactive reminder (Only fire if older than 3 hours, otherwise use stale one)
+      const cacheKey = `noted_proactive_reminder_${user?.id || 'default'}`;
+      let shouldFetchReminder = true;
+      const cached = localStorage.getItem(cacheKey);
+
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && typeof parsed.reminder === 'string') {
+            setProactiveReminder(parsed.reminder);
+            const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
+            const age = Date.now() - (parsed.timestamp || 0);
+            if (age < THREE_HOURS_MS) {
+              shouldFetchReminder = false; // Still fresh! Don't waste AI API calls on reload
+            }
+          }
+        } catch (e) {
+          console.warn("Failed to parse cached proactive reminder", e);
+        }
+      }
+
+      if (shouldFetchReminder) {
+        await fetchFreshProactiveReminder();
       }
 
       // 4. Fetch contacts for palette
@@ -119,6 +145,32 @@ export const Home = () => {
     } catch (e) {
       console.error("Error loading dashboard details:", e);
       setError(e.message || "Unable to connect to the backend server.");
+    }
+  };
+
+  const fetchFreshProactiveReminder = async () => {
+    setRefreshingReminder(true);
+    const cacheKey = `noted_proactive_reminder_${user?.id || 'default'}`;
+    try {
+      const reminderRes = await fetch(`${API_URL}/search/proactive`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (reminderRes.ok) {
+        const reminderData = await reminderRes.json();
+        const text = reminderData.reminder || '';
+        setProactiveReminder(text);
+        localStorage.setItem(cacheKey, JSON.stringify({
+          reminder: text,
+          timestamp: Date.now()
+        }));
+      } else {
+        const err = await reminderRes.json().catch(() => ({}));
+        console.warn(err.detail || `Failed to fetch reminders (HTTP ${reminderRes.status})`);
+      }
+    } catch (err) {
+      console.warn("Unable to fetch fresh proactive reminder:", err);
+    } finally {
+      setRefreshingReminder(false);
     }
   };
 
@@ -221,7 +273,7 @@ export const Home = () => {
   }).toUpperCase();
 
   return (
-    <div style={{ padding: '3rem 2.5rem', maxWidth: '1000px', margin: '0 auto', width: '100%', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>
+    <div className="dashboard-page-container" style={{ fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>
       
       {/* Dynamic Alert Banner */}
       {error && (
@@ -281,7 +333,7 @@ export const Home = () => {
         </h1>
       </div>
 
-      {/* Proactive Reminder (Subtle/Quiet Notification) */}
+      {/* Proactive Reminder (Subtle/Quiet Notification with Stale Cache & 3-hour TTL) */}
       {proactiveReminder && (
         <div style={{
           marginBottom: '2.5rem',
@@ -290,19 +342,42 @@ export const Home = () => {
           backgroundColor: 'var(--warm-bg)',
           padding: '1rem 1.25rem',
         }}>
-          <h4 style={{ 
-            fontSize: '0.7rem', 
-            fontWeight: 600, 
-            letterSpacing: '0.05em',
-            color: 'var(--purple-accent)', 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '0.375rem', 
-            textTransform: 'uppercase', 
-            marginBottom: '0.25rem' 
-          }}>
-            <Sparkles size={11} /> Attention Needed
-          </h4>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+            <h4 style={{ 
+              fontSize: '0.7rem', 
+              fontWeight: 600, 
+              letterSpacing: '0.05em', 
+              color: 'var(--purple-accent)', 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.375rem', 
+              textTransform: 'uppercase', 
+              margin: 0 
+            }}>
+              <Sparkles size={11} /> Attention Needed
+            </h4>
+            
+            <button
+              onClick={fetchFreshProactiveReminder}
+              disabled={refreshingReminder}
+              title="Refresh AI reminder now"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: refreshingReminder ? 'not-allowed' : 'pointer',
+                color: 'var(--text-secondary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                fontSize: '0.7rem',
+                padding: '0.15rem 0.35rem',
+                borderRadius: 'var(--radius-sm)'
+              }}
+            >
+              <RotateCw size={11} className={refreshingReminder ? 'spinner' : ''} />
+              <span>{refreshingReminder ? 'Thinking...' : 'Refresh'}</span>
+            </button>
+          </div>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-primary)', lineHeight: '1.4', margin: 0 }}>
             {proactiveReminder}
           </p>
@@ -354,9 +429,9 @@ export const Home = () => {
         </form>
         
         {/* Helper Shortcuts */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', padding: '0 0.25rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', padding: '0 0.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
           <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Search your memories, commitments, people, or notes:</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Search memory:</span>
             <button onClick={() => setChatQuery("What is due this week?")} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--purple-accent)', textDecoration: 'underline', padding: 0 }}>
               "What's due this week?"
             </button>
@@ -365,16 +440,29 @@ export const Home = () => {
               "What did I discuss with Rahul?"
             </button>
           </div>
-          <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
+          <button 
+            type="button"
+            onClick={() => { setShowPalette(true); setPaletteQuery(''); setSelectedIndex(0); }}
+            style={{ 
+              background: 'var(--warm-bg)', 
+              border: '1px solid var(--border-color)', 
+              borderRadius: 'var(--radius-sm)',
+              cursor: 'pointer', 
+              fontSize: '0.75rem', 
+              color: 'var(--text-secondary)', 
+              fontWeight: 500,
+              padding: '0.2rem 0.5rem'
+            }}
+          >
             ⌘ K Command palette
-          </span>
+          </button>
         </div>
 
         {/* Dynamic Thinking States */}
         {chatLoading && (
           <div style={{ marginTop: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem', color: 'var(--text-secondary)' }}>
             <div style={{ width: '40px', height: '40px' }}>
-              <Lottie src={loaderAnimation.default || loaderAnimation} loop={true} autoplay={true} />
+              <LottieAnimation animationData={loaderAnimation} loop={true} autoplay={true} />
             </div>
             <span style={{ fontSize: '0.85rem' }}>{loadingStatus}</span>
           </div>
@@ -412,7 +500,7 @@ export const Home = () => {
       </div>
 
       {/* 3. Dashboard Data (Flat 3-column layout) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: '2.5rem', borderTop: '1px solid var(--border-color)', paddingTop: '2.5rem' }}>
+      <div className="dashboard-stats-grid">
         
         {/* Column 1: Today Stats */}
         <div style={{ minWidth: 0 }}>
@@ -439,7 +527,7 @@ export const Home = () => {
           {recentNotes.length === 0 ? (
             <div style={{ padding: '0.25rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
               <div style={{ width: '100px', height: '100px', marginBottom: '0.5rem' }}>
-                <Lottie src={emptyAnimation.default || emptyAnimation} loop={true} autoplay={true} />
+                <LottieAnimation animationData={emptyAnimation} loop={true} autoplay={true} />
               </div>
               <p style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', margin: '0 0 0.15rem 0' }}>
                 Your memory is quiet.
@@ -472,7 +560,7 @@ export const Home = () => {
           {recentTasks.length === 0 ? (
             <div style={{ padding: '0.25rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
               <div style={{ width: '100px', height: '100px', marginBottom: '0.5rem' }}>
-                <Lottie src={successAnimation.default || successAnimation} loop={false} autoplay={true} />
+                <LottieAnimation animationData={successAnimation} loop={true} autoplay={true} />
               </div>
               <p style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', margin: '0 0 0.15rem 0' }}>
                 Nothing scheduled

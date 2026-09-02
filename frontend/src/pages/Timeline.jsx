@@ -82,7 +82,7 @@ export const Timeline = () => {
   }
 
   return (
-    <div style={{ padding: '2rem', maxWidth: '800px', margin: '0 auto', width: '100%' }}>
+    <div className="page-container">
       {error && (
         <div style={{
           backgroundColor: '#FCE8E6',

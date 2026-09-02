@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { EmptyContactsDoodle } from '../components/DoodleIllustrations';
-import { User, FileText, CheckSquare, Edit3, Save, Trash2 } from 'lucide-react';
+import { User, FileText, CheckSquare, Edit3, Save, Trash2, ArrowLeft } from 'lucide-react';
 
 export const Contacts = () => {
   const { token } = useAuth();
+  const navigate = useNavigate();
   const [contacts, setContacts] = useState([]);
   const [selectedContact, setSelectedContact] = useState(null);
   const [memories, setMemories] = useState({ notes: [], tasks: [] });
@@ -15,6 +17,7 @@ export const Contacts = () => {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [mobileShowDetails, setMobileShowDetails] = useState(false);
 
   useEffect(() => {
     fetchContacts();
@@ -53,6 +56,7 @@ export const Contacts = () => {
     setRole(contact.role || '');
     setContext(contact.context || '');
     setIsEditing(false);
+    setMobileShowDetails(true);
     
     // Fetch associated memories via graph relations
     try {
@@ -145,16 +149,9 @@ export const Contacts = () => {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden' }}>
+    <div className="contacts-container">
       {/* 1. Left Sidebar List */}
-      <div style={{
-        width: '260px',
-        borderRight: '1px solid var(--border-color)',
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: 'var(--warm-bg)',
-        flexShrink: 0
-      }}>
+      <div className={`contacts-list-panel ${mobileShowDetails ? 'hide-on-mobile' : ''}`}>
         <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
           <h2 style={{ fontSize: '1.2rem', fontWeight: 600 }}>Memory Profiles</h2>
         </div>
@@ -210,7 +207,27 @@ export const Contacts = () => {
       </div>
 
       {/* 2. Center Contact Profile Detail */}
-      <div style={{ flexGrow: 1, backgroundColor: '#FFFFFF', padding: '2.5rem', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+      <div className={`contacts-details-panel ${!mobileShowDetails ? 'hide-on-mobile' : ''}`} style={{ padding: '2rem' }}>
+        {/* Mobile Back Button */}
+        <div className="show-on-mobile hide-on-desktop" style={{ marginBottom: '1.25rem' }}>
+          <button 
+            onClick={() => setMobileShowDetails(false)}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.35rem',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              padding: 0
+            }}
+          >
+            <ArrowLeft size={16} /> Back to Contacts
+          </button>
+        </div>
         {error && (
           <div style={{
             backgroundColor: '#FCE8E6',
@@ -376,9 +393,29 @@ export const Contacts = () => {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     {memories.notes.map(note => (
-                      <div key={note.id} className="card" style={{ padding: '1rem' }}>
-                        <h4 style={{ fontSize: '0.9rem', fontWeight: 600 }}>{note.title}</h4>
-                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{note.summary}</p>
+                      <div 
+                        key={note.id} 
+                        className="card note-mention-card" 
+                        onClick={() => navigate('/notes', { state: { selectedNoteId: note.id } })}
+                        style={{ 
+                          padding: '1rem',
+                          cursor: 'pointer',
+                          transition: 'var(--transition)',
+                          backgroundColor: 'var(--surface-bg)'
+                        }}
+                        title="Click to open this note in the editor"
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                          <h4 style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                            {note.title || 'Untitled Note'}
+                          </h4>
+                          <span style={{ fontSize: '0.75rem', color: 'var(--purple-accent)', fontWeight: 500, flexShrink: 0, marginLeft: '0.5rem' }}>
+                            Open Note →
+                          </span>
+                        </div>
+                        <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
+                          {note.summary || (note.content ? note.content.substring(0, 80) + '...' : 'Open note memory')}
+                        </p>
                       </div>
                     ))}
                   </div>

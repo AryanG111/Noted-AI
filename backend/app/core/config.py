@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     
     # Default Models
-    OLLAMA_MODEL: str = "mistral"
+    OLLAMA_MODEL: str = "gpt-oss:20b-cloud"
     OLLAMA_EMBED_MODEL: str = "nomic-embed-text"
     
     GEMINI_MODEL: str = "gemma-4-26b-a4b-it"

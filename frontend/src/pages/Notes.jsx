@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { SparkleDoodle } from '../components/DoodleIllustrations';
-import { Plus, Trash2, Calendar, User, Check, CheckSquare } from 'lucide-react';
+import { Plus, Trash2, Calendar, User, Check, CheckSquare, ArrowLeft, Sparkles } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { Lottie } from 'lottie-react';
+import LottieAnimation from '../components/LottieAnimation';
 import loaderAnimation from '../assets/loader.json';
 import emptyAnimation from '../assets/empty.json';
 
 export const Notes = () => {
   const { token, activeKernel } = useAuth();
+  const location = useLocation();
   const [notes, setNotes] = useState([]);
   const [selectedNote, setSelectedNote] = useState(null);
   const [title, setTitle] = useState('');
@@ -18,13 +20,15 @@ export const Notes = () => {
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [mobileView, setMobileView] = useState('list'); // 'list' | 'editor' | 'insights'
   
   const saveTimeoutRef = useRef(null);
 
-  // Fetch all notes on startup
+  // Fetch all notes on startup or when target note passed from navigation
   useEffect(() => {
-    fetchNotes();
-  }, []);
+    const targetId = location.state?.selectedNoteId || new URLSearchParams(location.search).get('id');
+    fetchNotes(targetId);
+  }, [location.state?.selectedNoteId, location.search]);
 
   // Polling mechanism for background processing
   useEffect(() => {
@@ -94,6 +98,7 @@ export const Notes = () => {
     setTitle(note.title || '');
     setContent(note.content || '');
     setSavingStatus('');
+    setMobileView('editor');
   };
 
   const createNewNote = async () => {
@@ -112,6 +117,7 @@ export const Notes = () => {
       if (response.ok) {
         const newNote = await response.json();
         await fetchNotes(newNote.id);
+        setMobileView('editor');
         if (newNote.error) {
           setError(newNote.error);
           setProcessing(false);
@@ -239,16 +245,9 @@ export const Notes = () => {
   };
 
   return (
-    <div style={{ display: 'flex', height: '100%', width: '100%', overflow: 'hidden' }}>
+    <div className="notes-container">
       {/* 1. Left List Panel */}
-      <div style={{
-        width: '260px',
-        borderRight: '1px solid var(--border-color)',
-        display: 'flex',
-        flexDirection: 'column',
-        backgroundColor: 'var(--warm-bg)',
-        flexShrink: 0
-      }}>
+      <div className={`notes-list-panel ${mobileView !== 'list' ? 'hide-on-mobile' : ''}`}>
         <div style={{ padding: '1.25rem', borderBottom: '1px solid var(--border-color)' }}>
           <button 
             onClick={createNewNote}
@@ -372,15 +371,54 @@ export const Notes = () => {
       </div>
 
       {/* 2. Main Writing Canvas */}
-      <div style={{
-        flexGrow: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        height: '100%',
-        backgroundColor: '#FFFFFF'
-      }}>
+      <div className={`notes-editor-panel ${mobileView !== 'editor' ? 'hide-on-mobile' : ''}`}>
         {selectedNote ? (
           <div style={{ display: 'flex', flexDirection: 'column', height: '100%', width: '100%' }}>
+            {/* Mobile Navigation Header */}
+            <div className="show-on-mobile hide-on-desktop" style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0.65rem 1rem',
+              borderBottom: '1px solid var(--border-color)',
+              backgroundColor: 'var(--warm-bg)'
+            }}>
+              <button 
+                onClick={() => setMobileView('list')}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 600,
+                  color: 'var(--text-primary)'
+                }}
+              >
+                <ArrowLeft size={16} /> All Notes
+              </button>
+              
+              <button 
+                onClick={() => setMobileView('insights')}
+                style={{
+                  background: '#EDE9FE',
+                  border: 'none',
+                  borderRadius: '100px',
+                  padding: '0.25rem 0.65rem',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  fontSize: '0.75rem',
+                  color: 'var(--purple-accent)',
+                  fontWeight: 600
+                }}
+              >
+                <Sparkles size={13} /> AI Insights
+              </button>
+            </div>
             {/* Header / Save Indicators */}
             <div style={{
               display: 'flex',
@@ -466,7 +504,7 @@ export const Notes = () => {
             backgroundColor: 'var(--warm-bg)'
           }}>
             <div style={{ width: '150px', height: '150px', marginBottom: '0.5rem' }}>
-              <Lottie src={emptyAnimation.default || emptyAnimation} loop={true} autoplay={true} />
+              <LottieAnimation animationData={emptyAnimation} loop={true} autoplay={true} />
             </div>
             <p style={{ color: 'var(--text-secondary)', fontSize: '0.95rem' }}>Select a note or create a new one to begin.</p>
           </div>
@@ -475,16 +513,27 @@ export const Notes = () => {
 
       {/* 3. AI Cognitive Panel */}
       {selectedNote && (
-        <div style={{
-          width: '320px',
-          borderLeft: '1px solid var(--border-color)',
-          display: 'flex',
-          flexDirection: 'column',
-          backgroundColor: 'var(--warm-bg)',
-          padding: '1.5rem',
-          overflowY: 'auto',
-          flexShrink: 0
-        }}>
+        <div className={`notes-ai-panel ${mobileView !== 'insights' ? 'hide-on-mobile' : ''}`}>
+          {/* Mobile Back Button */}
+          <div className="show-on-mobile hide-on-desktop" style={{ marginBottom: '1rem' }}>
+            <button 
+              onClick={() => setMobileView('editor')}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                padding: 0
+              }}
+            >
+              <ArrowLeft size={16} /> Back to Editor
+            </button>
+          </div>
           {processing ? (
             <div style={{
               display: 'flex',
@@ -495,7 +544,7 @@ export const Notes = () => {
               gap: '1rem'
             }}>
               <div style={{ width: '80px', height: '80px' }}>
-                <Lottie src={loaderAnimation.default || loaderAnimation} loop={true} autoplay={true} />
+                <LottieAnimation animationData={loaderAnimation} loop={true} autoplay={true} />
               </div>
               <p className="doodle-text" style={{ fontSize: '1.15rem' }}>✦ Remembering this...</p>
             </div>

@@ -31,11 +31,7 @@ app = FastAPI(
 )
 
 # CORS configuration
-origins = [
-    "http://localhost",
-    "http://localhost:3000",
-    "http://localhost:5173",  # React default port
-]
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,

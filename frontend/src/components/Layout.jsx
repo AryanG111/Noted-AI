@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   Home, 
@@ -10,50 +10,153 @@ import {
   GitFork, 
   LogOut, 
   Sparkles,
-  ChevronDown
+  Menu,
+  X,
+  Cpu
 } from 'lucide-react';
 
 export const Layout = ({ children }) => {
   const { user, logout, activeKernel, updateKernel } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const navItems = [
+  const closeMobileMenu = () => {
+    setMobileMenuOpen(false);
+  };
+
+  const cycleKernel = () => {
+    const next = activeKernel === 'ollama' ? 'gemini' : activeKernel === 'gemini' ? 'groq' : 'ollama';
+    updateKernel(next);
+  };
+
+  const bottomNavItems = [
     { to: '/', label: 'Home', icon: Home },
     { to: '/notes', label: 'Notes', icon: FileText },
+    { to: '/tasks', label: 'Tasks', icon: CheckSquare },
     { to: '/timeline', label: 'Timeline', icon: Clock },
     { to: '/contacts', label: 'Contacts', icon: Users },
-    { to: '/tasks', label: 'Tasks', icon: CheckSquare },
-    { to: '/graph', label: 'Memory Graph', icon: GitFork },
   ];
 
   return (
     <div className="app-container">
-      {/* Sidebar */}
-      <aside className="sidebar">
-        {/* Logo and Brand */}
-        <div style={{ padding: '0 0.75rem', marginBottom: '2rem' }}>
-          <h2 style={{ 
-            fontSize: '0.9rem', 
+      {/* Mobile Top Header */}
+      <header className="mobile-header">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <button 
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="mobile-menu-btn"
+            aria-label="Toggle navigation menu"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0.35rem',
+              borderRadius: 'var(--radius-sm)'
+            }}
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+          <span style={{ 
+            fontSize: '0.95rem', 
             fontWeight: 700, 
             letterSpacing: '0.08em', 
             textTransform: 'uppercase',
             color: 'var(--text-primary)'
           }}>
             Noted
+          </span>
+        </div>
+
+        {/* AI Engine Switcher Chip for Mobile */}
+        <button 
+          onClick={cycleKernel}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            background: 'var(--surface-bg)',
+            border: '1px solid var(--border-color)',
+            padding: '0.3rem 0.6rem',
+            borderRadius: '100px',
+            cursor: 'pointer',
+            fontSize: '0.7rem',
+            color: 'var(--text-secondary)'
+          }}
+          title="Switch AI Engine"
+        >
+          <span style={{ 
+            width: '6px', 
+            height: '6px', 
+            borderRadius: '50%', 
+            backgroundColor: activeKernel === 'ollama' ? '#10B981' : '#6D5DFC'
+          }} />
+          <span style={{ fontWeight: 500 }}>
+            {activeKernel === 'ollama' ? 'Ollama' : activeKernel === 'gemini' ? 'Gemini' : 'Groq'}
+          </span>
+        </button>
+      </header>
+
+      {/* Mobile Drawer Backdrop */}
+      {mobileMenuOpen && (
+        <div 
+          className="mobile-drawer-backdrop" 
+          onClick={closeMobileMenu}
+        />
+      )}
+
+      {/* Sidebar (Desktop Sidebar & Mobile Drawer) */}
+      <aside className={`sidebar ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+        {/* Logo and Brand */}
+        <div style={{ 
+          padding: '0 0.75rem', 
+          marginBottom: '2rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between'
+        }}>
+          <h2 style={{ 
+            fontSize: '0.9rem', 
+            fontWeight: 700, 
+            letterSpacing: '0.08em', 
+            textTransform: 'uppercase',
+            color: 'var(--text-primary)',
+            margin: 0
+          }}>
+            Noted
           </h2>
+
+          {/* Close button inside mobile drawer */}
+          <button 
+            onClick={closeMobileMenu}
+            className="show-on-mobile hide-on-desktop"
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--text-secondary)',
+              padding: '0.25rem'
+            }}
+          >
+            <X size={18} />
+          </button>
         </div>
 
         {/* Navigation List */}
-        <nav style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+        <nav style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '1.5rem', overflowY: 'auto' }}>
           <div>
             <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               <li className="nav-item">
-                <NavLink to="/" className={({ isActive }) => isActive ? 'active' : ''}>
+                <NavLink to="/" onClick={closeMobileMenu} className={({ isActive }) => isActive ? 'active' : ''}>
                   <Home size={15} />
                   <span>Home</span>
                 </NavLink>
@@ -76,25 +179,25 @@ export const Layout = ({ children }) => {
             </span>
             <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               <li className="nav-item">
-                <NavLink to="/notes" className={({ isActive }) => isActive ? 'active' : ''}>
+                <NavLink to="/notes" onClick={closeMobileMenu} className={({ isActive }) => isActive ? 'active' : ''}>
                   <FileText size={15} />
                   <span>Notes</span>
                 </NavLink>
               </li>
               <li className="nav-item">
-                <NavLink to="/timeline" className={({ isActive }) => isActive ? 'active' : ''}>
+                <NavLink to="/timeline" onClick={closeMobileMenu} className={({ isActive }) => isActive ? 'active' : ''}>
                   <Clock size={15} />
                   <span>Timeline</span>
                 </NavLink>
               </li>
               <li className="nav-item">
-                <NavLink to="/tasks" className={({ isActive }) => isActive ? 'active' : ''}>
+                <NavLink to="/tasks" onClick={closeMobileMenu} className={({ isActive }) => isActive ? 'active' : ''}>
                   <CheckSquare size={15} />
                   <span>Tasks</span>
                 </NavLink>
               </li>
               <li className="nav-item">
-                <NavLink to="/contacts" className={({ isActive }) => isActive ? 'active' : ''}>
+                <NavLink to="/contacts" onClick={closeMobileMenu} className={({ isActive }) => isActive ? 'active' : ''}>
                   <Users size={15} />
                   <span>Contacts</span>
                 </NavLink>
@@ -117,7 +220,7 @@ export const Layout = ({ children }) => {
             </span>
             <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
               <li className="nav-item">
-                <NavLink to="/graph" className={({ isActive }) => isActive ? 'active' : ''}>
+                <NavLink to="/graph" onClick={closeMobileMenu} className={({ isActive }) => isActive ? 'active' : ''}>
                   <GitFork size={15} />
                   <span>Memory Graph</span>
                 </NavLink>
@@ -130,10 +233,7 @@ export const Layout = ({ children }) => {
         <hr style={{ border: 'none', borderTop: '1px solid var(--border-color)', margin: '1rem 0' }} />
 
         {/* Active Kernel Info */}
-        <div style={{ padding: '0 0.75rem', cursor: 'pointer' }} onClick={() => {
-          const next = activeKernel === 'ollama' ? 'gemini' : activeKernel === 'gemini' ? 'groq' : 'ollama';
-          updateKernel(next);
-        }}>
+        <div style={{ padding: '0 0.75rem', cursor: 'pointer' }} onClick={cycleKernel}>
           <span style={{ 
             fontSize: '0.65rem', 
             fontWeight: 600, 
@@ -147,10 +247,10 @@ export const Layout = ({ children }) => {
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
             <span style={{ 
-              width: '5px', 
-              height: '5px', 
+              width: '6px', 
+              height: '6px', 
               borderRadius: '50%', 
-              backgroundColor: 'var(--text-primary)',
+              backgroundColor: activeKernel === 'ollama' ? '#10B981' : '#6D5DFC',
               display: 'inline-block' 
             }} />
             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
@@ -210,6 +310,24 @@ export const Layout = ({ children }) => {
       <main className="main-content">
         {children}
       </main>
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav className="mobile-bottom-nav">
+        {bottomNavItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = location.pathname === item.to;
+          return (
+            <NavLink 
+              key={item.to} 
+              to={item.to} 
+              className={isActive ? 'active' : ''}
+            >
+              <Icon size={18} />
+              <span>{item.label}</span>
+            </NavLink>
+          );
+        })}
+      </nav>
     </div>
   );
 };
