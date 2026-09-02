@@ -18,13 +18,17 @@ class CognitiveExtractorService:
         if not current_time:
             current_time = datetime.datetime.now()
             
+        day_name = current_time.strftime("%A")
         time_str = current_time.strftime("%Y-%m-%dT%H:%M:%S")
         
         prompt_instructions = f"""
         Analyze the following user note. You must extract and summarize the content.
         
         Reference Information:
-        - Current local time is: {time_str} (Use this to resolve relative dates like 'tomorrow', 'next week', 'Friday').
+        - Current local time is: {time_str} ({day_name}).
+        - Date resolution rules: You MUST resolve relative dates (like 'this Sunday', 'next Sunday', 'tomorrow', 'next week', 'Friday') into an absolute ISO datetime (YYYY-MM-DDTHH:MM:SS) calculated from today's reference date and day of week ({day_name}, {time_str}).
+          For example:
+          - If today is Wednesday ({time_str[:10]}) and the user mentions 'this Sunday' or 'next Sunday', calculate the exact upcoming Sunday date and set due_date to that date (default to 09:00:00 or mentioned time).
         - User's Occupation: {occupation} (Use this context to prioritize terms, categories, or action items relevant to their domain).
         - AI Summary/Tone Style Preference: {ai_tone} (You MUST summarize the note using this tone/style. If tone is 'concise', write extremely short bullet-like summaries. If tone is 'creative', use engaging summaries with analogies. If tone is 'technical', emphasize specifications, data, and jargon. If tone is 'balanced', provide a normal objective, balanced summary).
         
@@ -36,8 +40,8 @@ class CognitiveExtractorService:
         5. "memory_type": A classification string which MUST be exactly one of: "idea", "meeting", "decision", "expense", or "general".
         6. "contacts": An array of names (first name, last name or full name) of people mentioned in the note text. Only extract actual names of people, not companies or products.
         7. "tasks": An array of items, each with:
-           - "description": A clear action item (e.g., "Send project proposal to Rahul").
-           - "due_date": An ISO datetime string (YYYY-MM-DDTHH:MM:SS) representing the task deadline, resolved using the reference current time. If no specific deadline is mentioned, return null.
+           - "description": A clear action item (e.g., "Follow up with Vishal regarding AWS meetup").
+           - "due_date": An ISO datetime string (YYYY-MM-DDTHH:MM:SS) representing the task deadline or event date, resolved accurately using the reference current time and day of week. Always resolve relative calendar days like 'this Sunday', 'tomorrow', 'next Monday' to their specific date string. If no date or timeframe is mentioned at all, return null.
            
         Example Output Format:
         {{
