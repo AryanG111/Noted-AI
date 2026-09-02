@@ -30,6 +30,18 @@ export const Notes = () => {
     fetchNotes(targetId);
   }, [location.state?.selectedNoteId, location.search]);
 
+  const latestTitleRef = useRef('');
+  const latestContentRef = useRef('');
+
+  // Keep refs up to date
+  useEffect(() => {
+    latestTitleRef.current = title;
+  }, [title]);
+
+  useEffect(() => {
+    latestContentRef.current = content;
+  }, [content]);
+
   // Polling mechanism for background processing
   useEffect(() => {
     if (!selectedNote || !selectedNote.is_processing) {
@@ -48,13 +60,23 @@ export const Notes = () => {
         if (response.ok) {
           const noteData = await response.json();
           if (!noteData.is_processing) {
-            // Processing complete!
-            setSelectedNote(noteData);
+            // Processing complete! Keep currently typed text in editor so we don't wipe it
+            setSelectedNote(prev => ({
+              ...noteData,
+              title: latestTitleRef.current || noteData.title,
+              content: latestContentRef.current || noteData.content
+            }));
             setProcessing(false);
             clearInterval(interval);
             
-            // Refresh note list to show updated title/summary/tags
-            fetchNotes(noteData.id);
+            // Refresh note list in sidebar
+            const listResponse = await fetch(`${API_URL}/notes`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (listResponse.ok) {
+              const listData = await listResponse.json();
+              setNotes(listData);
+            }
           }
         }
       } catch (err) {
@@ -97,6 +119,8 @@ export const Notes = () => {
     setSelectedNote(note);
     setTitle(note.title || '');
     setContent(note.content || '');
+    latestTitleRef.current = note.title || '';
+    latestContentRef.current = note.content || '';
     setSavingStatus('');
     setMobileView('editor');
   };
@@ -156,6 +180,8 @@ export const Notes = () => {
           setSelectedNote(null);
           setTitle('');
           setContent('');
+          latestTitleRef.current = '';
+          latestContentRef.current = '';
         }
         await fetchNotes();
       } else {
@@ -193,8 +219,12 @@ export const Notes = () => {
         });
         if (response.ok) {
           const updated = await response.json();
-          // Update selected note with pipeline results
-          setSelectedNote(updated);
+          // Update selected note with pipeline results, preserving newer keystrokes
+          setSelectedNote(prev => ({
+            ...updated,
+            title: latestTitleRef.current,
+            content: latestContentRef.current
+          }));
           if (updated.error) {
             setError(updated.error);
             setSavingStatus('Saved (Ingestion Error)');
@@ -235,13 +265,15 @@ export const Notes = () => {
   const handleTitleChange = (e) => {
     const val = e.target.value;
     setTitle(val);
-    triggerAutoSave(val, content);
+    latestTitleRef.current = val;
+    triggerAutoSave(val, latestContentRef.current);
   };
 
   const handleContentChange = (e) => {
     const val = e.target.value;
     setContent(val);
-    triggerAutoSave(title, val);
+    latestContentRef.current = val;
+    triggerAutoSave(latestTitleRef.current, val);
   };
 
   return (
