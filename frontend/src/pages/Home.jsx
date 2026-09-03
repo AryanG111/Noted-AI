@@ -61,8 +61,10 @@ export const Home = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (token) {
+      fetchDashboardData();
+    }
+  }, [token]);
 
   useEffect(() => {
     const handleKeyDown = (e) => {

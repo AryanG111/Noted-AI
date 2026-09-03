@@ -462,6 +462,7 @@ a:hover {
   height: 100%;
   background-color: #FFFFFF;
   overflow-y: auto;
+  padding: 2.5rem 3rem;
 }
 
 /* ==========================================================================
@@ -611,6 +612,23 @@ a:hover {
 
   .contacts-details-panel {
     width: 100% !important;
+    padding: 1.25rem 1rem !important;
+  }
+
+  .contacts-profile-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 1rem !important;
+  }
+
+  .contacts-profile-header > div:last-child {
+    width: 100% !important;
+    justify-content: flex-start !important;
+  }
+
+  .contacts-memories-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem !important;
   }
 
   /* Command Palette on mobile */
@@ -685,5 +703,76 @@ a:hover {
   color: var(--text-primary);
   border-color: #D1D5DB;
   transform: translateY(-1px);
+}
+
+/* Tab Guide Bulb button */
+.tab-guide-bulb-btn:hover {
+  background-color: #FFFFFF !important;
+  border-color: #D1D5DB !important;
+  transform: translateY(-1px);
+}
+
+.sidebar-tab-row {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.nav-bulb-trigger {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0.35rem;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.15s ease;
+  margin-right: 0.25rem;
+}
+
+.sidebar-tab-row:hover .nav-bulb-trigger,
+.sidebar-tab-row:focus-within .nav-bulb-trigger {
+  opacity: 1;
+}
+
+.nav-bulb-trigger:hover {
+  background-color: #FFFFFF;
+  color: #F59E0B;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+
+/* Tour & Guide Modals */
+.tour-overlay-backdrop,
+.tab-guide-overlay {
+  animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tab-guide-card {
+  animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes tourCardSlide {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes modalSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 

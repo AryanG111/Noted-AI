@@ -207,9 +207,9 @@ export const Contacts = () => {
       </div>
 
       {/* 2. Center Contact Profile Detail */}
-      <div className={`contacts-details-panel ${!mobileShowDetails ? 'hide-on-mobile' : ''}`} style={{ padding: '2rem' }}>
+      <div className={`contacts-details-panel ${!mobileShowDetails ? 'hide-on-mobile' : ''}`}>
         {/* Mobile Back Button */}
-        <div className="show-on-mobile hide-on-desktop" style={{ marginBottom: '1.25rem' }}>
+        <div className="show-on-mobile hide-on-desktop" style={{ marginBottom: '1rem' }}>
           <button 
             onClick={() => setMobileShowDetails(false)}
             style={{
@@ -235,7 +235,7 @@ export const Contacts = () => {
             padding: '0.75rem 1rem',
             borderRadius: 'var(--radius-sm)',
             fontSize: '0.85rem',
-            marginBottom: '2rem',
+            marginBottom: '1.5rem',
             border: '1px solid #FAD2CF',
             display: 'flex',
             justifyContent: 'space-between',
@@ -248,24 +248,25 @@ export const Contacts = () => {
           </div>
         )}
         {selectedContact ? (
-          <div style={{ maxWidth: '800px', width: '100%' }}>
+          <div style={{ maxWidth: '840px', width: '100%' }}>
             {/* Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div className="contacts-profile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0 }}>
                 <div style={{
-                  width: '56px',
-                  height: '56px',
+                  width: '52px',
+                  height: '52px',
                   borderRadius: '50%',
                   backgroundColor: '#E8F0FE',
                   color: 'var(--blue-accent)',
                   display: 'flex',
                   alignItems: 'center',
-                  justifyContent: 'center'
+                  justifyContent: 'center',
+                  flexShrink: 0
                 }}>
-                  <User size={28} />
+                  <User size={26} />
                 </div>
                 <div>
-                  <h1 style={{ fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)' }}>
+                  <h1 style={{ fontSize: '1.65rem', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)', margin: 0 }}>
                     {selectedContact.name}
                   </h1>
                   {isEditing ? (
@@ -381,7 +382,7 @@ export const Contacts = () => {
             </div>
 
             {/* Linked Notes & Tasks */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div className="contacts-memories-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1.25rem' }}>
               {/* Note mentions */}
               <div>
                 <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
