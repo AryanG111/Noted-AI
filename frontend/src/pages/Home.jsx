@@ -1,6 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth, API_URL } from '../context/AuthContext';
-import { Search, Send, FileText, CheckSquare, Sparkles, RotateCw } from 'lucide-react';
+import { 
+  Search, 
+  Send, 
+  FileText, 
+  CheckSquare, 
+  Sparkles, 
+  RotateCw, 
+  ArrowRight, 
+  Zap, 
+  Users, 
+  Brain, 
+  Plus,
+  Compass,
+  Lightbulb
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import LottieAnimation from '../components/LottieAnimation';
 import ReactMarkdown from 'react-markdown';
@@ -25,6 +39,7 @@ export const Home = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   
   // Dashboard states
+  const [dashboardLoading, setDashboardLoading] = useState(true);
   const [recentTasks, setRecentTasks] = useState([]);
   const [notesCount, setNotesCount] = useState(0);
   const [recentNotes, setRecentNotes] = useState([]);
@@ -145,6 +160,8 @@ export const Home = () => {
     } catch (e) {
       console.error("Error loading dashboard details:", e);
       setError(e.message || "Unable to connect to the backend server.");
+    } finally {
+      setDashboardLoading(false);
     }
   };
 
@@ -316,28 +333,176 @@ export const Home = () => {
         </div>
       )}
 
-      {/* 1. Header (Editorial Date) */}
-      <div style={{ marginBottom: '2.5rem' }}>
-        <div style={{ 
-          fontSize: '0.7rem', 
-          fontWeight: 600, 
-          letterSpacing: '0.08em', 
-          color: 'var(--text-secondary)', 
-          textTransform: 'uppercase', 
-          marginBottom: '0.25rem' 
-        }}>
-          {formattedDate}
+      {/* 1. Header (Clean Editorial Greeting + New Note Action) */}
+      <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
+          <div style={{ 
+            fontSize: '0.7rem', 
+            fontWeight: 600, 
+            letterSpacing: '0.08em', 
+            color: 'var(--text-secondary)', 
+            textTransform: 'uppercase', 
+            marginBottom: '0.25rem' 
+          }}>
+            {formattedDate}
+          </div>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)', margin: 0 }}>
+            Good morning, {user?.full_name?.split(' ')[0] || 'Aryan'}.
+          </h1>
         </div>
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 500, letterSpacing: '-0.02em', color: 'var(--text-primary)', margin: 0 }}>
-          Good morning, {user?.full_name?.split(' ')[0] || 'Aryan'}.
-        </h1>
+
+        <button
+          onClick={() => navigate('/notes')}
+          className="btn btn-primary"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.55rem 1rem',
+            fontSize: '0.85rem',
+            fontWeight: 500
+          }}
+        >
+          <Plus size={15} /> New Note
+        </button>
+      </div>
+
+      {/* 2. Clean, Minimal KPI Cards (Monochrome / Neutral Aesthetic) */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: '1rem',
+        marginBottom: '2.25rem'
+      }}>
+        <div 
+          onClick={() => navigate('/notes')}
+          style={{
+            backgroundColor: '#FFFFFF',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            padding: '1rem 1.25rem',
+            cursor: 'pointer',
+            transition: 'var(--transition)'
+          }}
+          className="note-mention-card"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Notes</span>
+            <FileText size={15} style={{ color: 'var(--text-secondary)' }} />
+          </div>
+          {dashboardLoading ? (
+            <div>
+              <div className="skeleton-box" style={{ width: '32px', height: '28px', marginTop: '0.2rem' }} />
+              <div className="skeleton-box" style={{ width: '80px', height: '12px', marginTop: '0.4rem' }} />
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {notesCount}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                {notesCount === 1 ? '1 saved note' : `${notesCount} saved notes`}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div 
+          onClick={() => navigate('/tasks')}
+          style={{
+            backgroundColor: '#FFFFFF',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            padding: '1rem 1.25rem',
+            cursor: 'pointer',
+            transition: 'var(--transition)'
+          }}
+          className="note-mention-card"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tasks</span>
+            <CheckSquare size={15} style={{ color: 'var(--text-secondary)' }} />
+          </div>
+          {dashboardLoading ? (
+            <div>
+              <div className="skeleton-box" style={{ width: '32px', height: '28px', marginTop: '0.2rem' }} />
+              <div className="skeleton-box" style={{ width: '85px', height: '12px', marginTop: '0.4rem' }} />
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {recentTasks.length}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                {recentTasks.length === 1 ? '1 pending task' : `${recentTasks.length} pending tasks`}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div 
+          onClick={() => navigate('/contacts')}
+          style={{
+            backgroundColor: '#FFFFFF',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            padding: '1rem 1.25rem',
+            cursor: 'pointer',
+            transition: 'var(--transition)'
+          }}
+          className="note-mention-card"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Contacts</span>
+            <Users size={15} style={{ color: 'var(--text-secondary)' }} />
+          </div>
+          {dashboardLoading ? (
+            <div>
+              <div className="skeleton-box" style={{ width: '32px', height: '28px', marginTop: '0.2rem' }} />
+              <div className="skeleton-box" style={{ width: '95px', height: '12px', marginTop: '0.4rem' }} />
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                {allContacts.length}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+                {allContacts.length === 1 ? '1 person tracked' : `${allContacts.length} people tracked`}
+              </div>
+            </>
+          )}
+        </div>
+
+        <div 
+          onClick={() => navigate('/graph')}
+          style={{
+            backgroundColor: '#FFFFFF',
+            border: '1px solid var(--border-color)',
+            borderRadius: 'var(--radius-md)',
+            padding: '1rem 1.25rem',
+            cursor: 'pointer',
+            transition: 'var(--transition)'
+          }}
+          className="note-mention-card"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Graph</span>
+            <Compass size={15} style={{ color: 'var(--text-secondary)' }} />
+          </div>
+          <div style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--text-primary)', marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            View Connections <ArrowRight size={13} />
+          </div>
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
+            Interactive memory map
+          </div>
+        </div>
       </div>
 
       {/* Proactive Reminder (Subtle/Quiet Notification with Stale Cache & 3-hour TTL) */}
       {proactiveReminder && (
         <div style={{
           marginBottom: '2.5rem',
-          border: '1px dashed var(--purple-accent)',
+          border: '1px dashed #D1D5DB',
           borderRadius: 'var(--radius-sm)',
           backgroundColor: 'var(--warm-bg)',
           padding: '1rem 1.25rem',
@@ -347,7 +512,7 @@ export const Home = () => {
               fontSize: '0.7rem', 
               fontWeight: 600, 
               letterSpacing: '0.05em', 
-              color: 'var(--purple-accent)', 
+              color: 'var(--text-primary)', 
               display: 'flex', 
               alignItems: 'center', 
               gap: '0.375rem', 
@@ -360,7 +525,7 @@ export const Home = () => {
             <button
               onClick={fetchFreshProactiveReminder}
               disabled={refreshingReminder}
-              title="Refresh AI reminder now"
+              title="Refresh reminder"
               style={{
                 background: 'none',
                 border: 'none',
@@ -375,7 +540,7 @@ export const Home = () => {
               }}
             >
               <RotateCw size={11} className={refreshingReminder ? 'spinner' : ''} />
-              <span>{refreshingReminder ? 'Thinking...' : 'Refresh'}</span>
+              <span>{refreshingReminder ? 'Checking...' : 'Refresh'}</span>
             </button>
           </div>
           <p style={{ fontSize: '0.875rem', color: 'var(--text-primary)', lineHeight: '1.4', margin: 0 }}>
@@ -384,77 +549,89 @@ export const Home = () => {
         </div>
       )}
 
-      {/* 2. Ask Noted - Unified Hero Command Box */}
-      <div style={{ marginBottom: '3.5rem' }}>
+      {/* 3. Search & Ask Memory (Sleek Clean Styling with Hover Suggestions) */}
+      <div className="search-section-container" style={{ marginBottom: '2.75rem' }}>
         <form onSubmit={handleAskNoted} style={{ position: 'relative', width: '100%' }}>
           <input 
             type="text" 
             value={chatQuery}
             onChange={(e) => setChatQuery(e.target.value)}
-            placeholder="Ask or search your memory..." 
+            placeholder="Search notes or ask a question..." 
             style={{
               width: '100%',
-              padding: '1.1rem 3.5rem 1.1rem 1.25rem',
-              fontSize: '1.05rem',
+              padding: '1.05rem 3.5rem 1.05rem 1.25rem',
+              fontSize: '0.975rem',
               border: '1px solid var(--border-color)',
               borderRadius: 'var(--radius-md)',
-              backgroundColor: 'transparent',
+              backgroundColor: '#FFFFFF',
               outline: 'none',
               color: 'var(--text-primary)',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
               transition: 'var(--transition)'
             }}
-            onFocus={(e) => e.target.style.borderColor = 'var(--text-secondary)'}
+            onFocus={(e) => e.target.style.borderColor = 'var(--text-primary)'}
             onBlur={(e) => e.target.style.borderColor = 'var(--border-color)'}
           />
           <button 
             type="submit" 
-            disabled={chatLoading} 
+            disabled={chatLoading || !chatQuery.trim()} 
             style={{ 
               position: 'absolute', 
-              right: '16px', 
+              right: '12px', 
               top: '50%', 
               transform: 'translateY(-50%)', 
-              background: 'none', 
+              background: chatQuery.trim() ? 'var(--text-primary)' : 'none', 
               border: 'none', 
-              cursor: 'pointer',
-              color: 'var(--text-secondary)',
+              borderRadius: 'var(--radius-sm)',
+              cursor: chatQuery.trim() ? 'pointer' : 'default',
+              color: chatQuery.trim() ? '#FFFFFF' : 'var(--text-secondary)',
               display: 'flex',
               alignItems: 'center',
-              padding: 0,
+              justifyContent: 'center',
+              width: '32px',
+              height: '32px',
               transition: 'var(--transition)'
             }}
           >
-            <Send size={18} />
+            <Send size={15} />
           </button>
         </form>
         
-        {/* Helper Shortcuts */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.75rem', padding: '0 0.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-          <div style={{ display: 'flex', gap: '0.375rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>Search memory:</span>
-            <button onClick={() => setChatQuery("What is due this week?")} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--purple-accent)', textDecoration: 'underline', padding: 0 }}>
+        {/* Helper suggestions visible on Hover or Focus */}
+        <div className="search-suggestions-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.65rem', padding: '0 0.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>Suggestions:</span>
+            <button 
+              type="button"
+              onClick={() => setChatQuery("What is due this week?")} 
+              className="suggestion-pill"
+            >
               "What's due this week?"
             </button>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>·</span>
-            <button onClick={() => setChatQuery("What did I discuss with Rahul?")} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.75rem', color: 'var(--purple-accent)', textDecoration: 'underline', padding: 0 }}>
-              "What did I discuss with Rahul?"
+            <button 
+              type="button"
+              onClick={() => setChatQuery("What notes mention meetings?")} 
+              className="suggestion-pill"
+            >
+              "Meeting notes"
             </button>
           </div>
+
           <button 
             type="button"
             onClick={() => { setShowPalette(true); setPaletteQuery(''); setSelectedIndex(0); }}
             style={{ 
-              background: 'var(--warm-bg)', 
+              background: 'none', 
               border: '1px solid var(--border-color)', 
               borderRadius: 'var(--radius-sm)',
               cursor: 'pointer', 
-              fontSize: '0.75rem', 
+              fontSize: '0.72rem', 
               color: 'var(--text-secondary)', 
               fontWeight: 500,
               padding: '0.2rem 0.5rem'
             }}
           >
-            ⌘ K Command palette
+            ⌘ K Quick search
           </button>
         </div>
 
@@ -507,16 +684,23 @@ export const Home = () => {
           <h3 style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1.25rem' }}>
             Today
           </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
-            <div>
-              <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{recentTasks.length}</strong>
-              <span style={{ color: 'var(--text-secondary)', marginLeft: '0.375rem' }}>commitments</span>
+          {dashboardLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+              <div className="skeleton-box" style={{ width: '110px', height: '18px' }} />
+              <div className="skeleton-box" style={{ width: '95px', height: '18px' }} />
             </div>
-            <div>
-              <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{notesCount}</strong>
-              <span style={{ color: 'var(--text-secondary)', marginLeft: '0.375rem' }}>memories</span>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
+              <div>
+                <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{recentTasks.length}</strong>
+                <span style={{ color: 'var(--text-secondary)', marginLeft: '0.375rem' }}>commitments</span>
+              </div>
+              <div>
+                <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{notesCount}</strong>
+                <span style={{ color: 'var(--text-secondary)', marginLeft: '0.375rem' }}>memories</span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Column 2: Recent Memories */}
@@ -524,16 +708,27 @@ export const Home = () => {
           <h3 style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1.25rem' }}>
             Recent
           </h3>
-          {recentNotes.length === 0 ? (
-            <div style={{ padding: '0.25rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
-              <div style={{ width: '100px', height: '100px', marginBottom: '0.5rem' }}>
+          {dashboardLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              <div>
+                <div className="skeleton-box" style={{ width: '70%', height: '14px', marginBottom: '0.35rem' }} />
+                <div className="skeleton-box" style={{ width: '90%', height: '11px' }} />
+              </div>
+              <div>
+                <div className="skeleton-box" style={{ width: '60%', height: '14px', marginBottom: '0.35rem' }} />
+                <div className="skeleton-box" style={{ width: '80%', height: '11px' }} />
+              </div>
+            </div>
+          ) : recentNotes.length === 0 ? (
+            <div style={{ padding: '0.5rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+              <div style={{ width: '85px', height: '85px', marginBottom: '0.35rem' }}>
                 <LottieAnimation animationData={emptyAnimation} loop={true} autoplay={true} />
               </div>
               <p style={{ fontSize: '0.85rem', fontWeight: 500, color: 'var(--text-primary)', margin: '0 0 0.15rem 0' }}>
-                Your memory is quiet.
+                No recent notes
               </p>
               <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', margin: 0, lineHeight: '1.4' }}>
-                Conversations, decisions and important context will appear here as Noted learns what matters.
+                Your saved thoughts and summaries will appear here.
               </p>
             </div>
           ) : (
@@ -557,7 +752,12 @@ export const Home = () => {
           <h3 style={{ fontSize: '0.7rem', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem', marginBottom: '1.25rem' }}>
             Up Next
           </h3>
-          {recentTasks.length === 0 ? (
+          {dashboardLoading ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
+              <div className="skeleton-box" style={{ width: '85%', height: '14px' }} />
+              <div className="skeleton-box" style={{ width: '75%', height: '14px' }} />
+            </div>
+          ) : recentTasks.length === 0 ? (
             <div style={{ padding: '0.25rem 0', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
               <div style={{ width: '100px', height: '100px', marginBottom: '0.5rem' }}>
                 <LottieAnimation animationData={successAnimation} loop={true} autoplay={true} />

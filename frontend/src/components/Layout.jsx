@@ -129,9 +129,9 @@ export const Layout = ({ children }) => {
             fontSize: '0.9rem', 
             fontWeight: 700, 
             letterSpacing: '0.08em', 
-            textTransform: 'uppercase',
-            color: 'var(--text-primary)',
-            margin: 0
+            textTransform: 'uppercase', 
+            color: 'var(--text-primary)', 
+            margin: 0 
           }}>
             Noted
           </h2>

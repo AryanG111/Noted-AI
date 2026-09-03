@@ -625,21 +625,65 @@ a:hover {
   }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.skeleton-box {
+  background-color: #ECEAE5;
+  border-radius: var(--radius-sm);
+  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
 .note-mention-card {
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
-  transition: var(--transition);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
 }
 
 .note-mention-card:hover {
-  border-color: var(--purple-accent) !important;
+  border-color: #D1D5DB !important;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(109, 93, 252, 0.08);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.04);
   background-color: #FFFFFF !important;
+}
+
+/* Search suggestions visible on hover/focus of search area */
+.search-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.search-suggestions-row {
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.search-section-container:hover .search-suggestions-row,
+.search-section-container:focus-within .search-suggestions-row {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.suggestion-pill {
+  background: var(--warm-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 100px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  padding: 0.25rem 0.65rem;
+  transition: all 0.15s ease;
+}
+
+.suggestion-pill:hover {
+  background: #FFFFFF;
+  color: var(--text-primary);
+  border-color: #D1D5DB;
+  transform: translateY(-1px);
 }
 
