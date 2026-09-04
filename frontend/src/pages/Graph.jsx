@@ -720,10 +720,19 @@ export const Graph = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '82vh', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>
+    <div style={{ 
+      display: 'flex', 
+      flexDirection: 'column', 
+      height: '100%', 
+      minHeight: '100%',
+      padding: '2rem 2.5rem',
+      fontFamily: 'var(--font-sans)', 
+      color: 'var(--text-primary)',
+      boxSizing: 'border-box'
+    }}>
       
       {/* 1. Header & Quick Controls */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.2rem' }}>
             <span style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--purple-accent)' }}>
