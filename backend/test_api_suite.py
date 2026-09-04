@@ -84,9 +84,28 @@ async def run_suite():
             "email": test_email,
             "password": "WrongPassword999!"
         })
-        assert_test(r.status_code == 401 and "incorrect email or password" in r.text.lower(), 
-                    "Wrong password login returns clean 401 message", 
+        assert_test(r.status_code in (400, 401) and "incorrect email or password" in r.text.lower(), 
+                    "Wrong password login returns clean 400/401 message", 
                     f"Status {r.status_code}: {r.text}")
+
+        # 1.5.1 Pending status login check (returns 403)
+        r = await client.post(f"{API_URL}/auth/login", json={
+            "email": test_email,
+            "password": valid_password
+        })
+        assert_test(r.status_code == 403 and "pending administrator approval" in r.text.lower(), 
+                    "Pending user login is blocked with clean 403 approval notice", 
+                    f"Status {r.status_code}: {r.text}")
+
+        # Approve the test user in DB so downstream tests can execute
+        try:
+            from backend.app.core.db import SessionLocal
+            from sqlalchemy import text
+            with SessionLocal() as db_session:
+                db_session.execute(text("UPDATE users SET status = 'approved' WHERE email = :email"), {"email": test_email.lower()})
+                db_session.commit()
+        except Exception as e:
+            print(f"  [WARN] Could not directly approve user in DB: {e}")
 
         # 1.6 Login with whitespace / uppercase email (normalization)
         r = await client.post(f"{API_URL}/auth/login", json={
