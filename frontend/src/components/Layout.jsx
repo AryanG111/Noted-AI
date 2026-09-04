@@ -36,7 +36,9 @@ export const Layout = ({ children }) => {
   };
 
   const cycleKernel = () => {
-    const next = activeKernel === 'ollama' ? 'gemini' : activeKernel === 'gemini' ? 'groq' : 'ollama';
+    const sequence = ['gemini', 'openrouter', 'groq', 'ollama'];
+    const currentIndex = sequence.indexOf(activeKernel);
+    const next = sequence[(currentIndex + 1) % sequence.length];
     updateKernel(next);
   };
 
@@ -124,10 +126,10 @@ export const Layout = ({ children }) => {
               width: '6px', 
               height: '6px', 
               borderRadius: '50%', 
-              backgroundColor: activeKernel === 'ollama' ? '#10B981' : '#6D5DFC'
+              backgroundColor: activeKernel === 'ollama' ? '#10B981' : activeKernel === 'openrouter' ? '#F59E0B' : '#6D5DFC'
             }} />
             <span style={{ fontWeight: 500 }}>
-              {activeKernel === 'ollama' ? 'Ollama' : activeKernel === 'gemini' ? 'Gemini' : 'Groq'}
+              {activeKernel === 'ollama' ? 'Ollama' : activeKernel === 'gemini' ? 'Gemini' : activeKernel === 'openrouter' ? 'OpenRouter' : 'Groq'}
             </span>
           </button>
         </div>
@@ -405,11 +407,11 @@ export const Layout = ({ children }) => {
               width: '6px', 
               height: '6px', 
               borderRadius: '50%', 
-              backgroundColor: activeKernel === 'ollama' ? '#10B981' : '#6D5DFC',
+              backgroundColor: activeKernel === 'ollama' ? '#10B981' : activeKernel === 'openrouter' ? '#F59E0B' : '#6D5DFC',
               display: 'inline-block' 
             }} />
             <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              {activeKernel === 'ollama' ? 'Ollama · Local' : activeKernel === 'gemini' ? 'Gemini · Cloud' : 'Groq · Cloud'}
+              {activeKernel === 'ollama' ? 'Ollama · Local' : activeKernel === 'gemini' ? 'Gemini · Cloud' : activeKernel === 'openrouter' ? 'OpenRouter · Cloud' : 'Groq · Cloud'}
             </span>
           </div>
         </div>

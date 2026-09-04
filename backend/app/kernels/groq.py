@@ -6,7 +6,15 @@ from backend.app.core.config import settings
 class GroqAdapter(LLMKernelAdapter):
     def __init__(self):
         self.api_key = settings.GROQ_API_KEY
-        self.model = settings.GROQ_MODEL
+        self.models_fallback_chain = [
+            settings.GROQ_MODEL or "openai/gpt-oss-120b",
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
+            "qwen/qwen3.8-27b",
+            "qwen/qwen3.6-27b",
+            "allam-2-7b"
+        ]
+        self.models_fallback_chain = list(dict.fromkeys(self.models_fallback_chain))
         self.client = httpx.AsyncClient(timeout=60.0)
         
     async def generate_chat_completion(self, messages: List[Dict[str, str]], temperature: float = 0.7) -> str:
@@ -14,25 +22,34 @@ class GroqAdapter(LLMKernelAdapter):
             raise ValueError("GROQ_API_KEY is not configured in settings.")
             
         url = "https://api.groq.com/openai/v1/chat/completions"
-        payload = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": temperature
-        }
-        
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self.api_key}"
         }
         
-        response = await self.client.post(url, json=payload, headers=headers)
-        response.raise_for_status()
-        
-        data = response.json()
-        try:
-            return data["choices"][0]["message"]["content"]
-        except (KeyError, IndexError):
-            raise RuntimeError(f"Unexpected response structure from Groq API: {data}")
+        last_error = None
+        for model in self.models_fallback_chain:
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature
+            }
+            try:
+                response = await self.client.post(url, json=payload, headers=headers)
+                if response.status_code == 200:
+                    data = response.json()
+                    return data["choices"][0]["message"]["content"]
+                elif response.status_code in [429, 404, 500, 503]:
+                    print(f"[Groq Fallback] Model '{model}' returned {response.status_code}. Retrying with next model...")
+                    last_error = f"{model} (HTTP {response.status_code})"
+                    continue
+                else:
+                    response.raise_for_status()
+            except httpx.HTTPError as e:
+                last_error = str(e)
+                continue
+                
+        raise RuntimeError(f"All Groq fallback models failed. Last error: {last_error}")
 
     async def generate_embeddings(self, text: str) -> List[float]:
         # Groq does not natively provide embedding models. 

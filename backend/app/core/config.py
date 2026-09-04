@@ -18,11 +18,14 @@ class Settings(BaseSettings):
     CHROMA_DB_DIR: str = "./chroma_db"
     
     # LLM Settings
-    ACTIVE_LLM_PROVIDER: str = "ollama"  # ollama, gemini, groq
+    ACTIVE_LLM_PROVIDER: str = "gemini"  # ollama, gemini, groq, openrouter
     
     # API Keys & Endpoints
     GEMINI_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
+    OPENROUTER_API_KEY: Optional[str] = None
+    OPENROUTER_SITE_URL: str = "http://localhost:5173"
+    OPENROUTER_SITE_NAME: str = "Noted AI"
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     
     # Default Models
@@ -31,6 +34,7 @@ class Settings(BaseSettings):
     
     GEMINI_MODEL: str = "gemma-4-26b-a4b-it"
     GROQ_MODEL: str = "llama3-8b-8192"
+    OPENROUTER_MODEL: str = "openai/gpt-4o"
     
     class Config:
         env_file = ".env"

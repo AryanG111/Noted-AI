@@ -114,6 +114,19 @@ async def ask_noted(
                 model="gemma2-9b-it",
                 temperature=0.0
             )
+        elif provider == "openrouter":
+            if not settings.OPENROUTER_API_KEY:
+                raise ValueError("OPENROUTER_API_KEY is not configured in your environment settings (.env).")
+            llm = ChatOpenAI(
+                base_url="https://openrouter.ai/api/v1",
+                api_key=settings.OPENROUTER_API_KEY,
+                model=settings.OPENROUTER_MODEL,
+                temperature=0.0,
+                default_headers={
+                    "HTTP-Referer": settings.OPENROUTER_SITE_URL,
+                    "X-Title": settings.OPENROUTER_SITE_NAME
+                }
+            )
         else: # ollama
             llm = ChatOpenAI(
                 base_url=f"{settings.OLLAMA_BASE_URL}/v1",
