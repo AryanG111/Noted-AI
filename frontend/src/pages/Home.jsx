@@ -28,7 +28,6 @@ import ReactMarkdown from 'react-markdown';
 import loaderAnimation from '../assets/loader.json';
 import successAnimation from '../assets/success.json';
 import emptyAnimation from '../assets/empty.json';
-import waveAnimation from '../assets/wave.json';
 
 export const Home = () => {
   const { token, activeKernel, user } = useAuth();
@@ -306,76 +305,38 @@ export const Home = () => {
         </div>
       )}
 
-      {/* 1. Welcoming Hero Banner with Proper Lottie Staging */}
-      <div style={{
-        marginBottom: '2rem',
-        backgroundColor: '#FFFFFF',
-        border: '1px solid var(--border-color)',
-        borderRadius: 'var(--radius-lg)',
-        padding: '1.5rem 2rem',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '1.5rem',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.02)'
-      }}>
-        <div style={{ flex: '1 1 320px', minWidth: 0 }}>
+      {/* 1. Header (Clean Editorial Greeting + New Note Action) */}
+      <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
+        <div>
           <div style={{ 
-            fontSize: '0.72rem', 
+            fontSize: '0.7rem', 
             fontWeight: 600, 
             letterSpacing: '0.08em', 
             color: 'var(--text-secondary)', 
             textTransform: 'uppercase', 
-            marginBottom: '0.35rem' 
+            marginBottom: '0.25rem' 
           }}>
             {formattedDate}
           </div>
-          <h1 style={{ fontSize: '1.85rem', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)', margin: '0 0 0.4rem 0' }}>
+          <h1 style={{ fontSize: '1.75rem', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)', margin: 0 }}>
             Good morning, {user?.full_name?.split(' ')[0] || 'Aryan'}.
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', margin: '0 0 1.25rem 0', lineHeight: '1.5' }}>
-            Your cognitive workspace is synced and ready.
-          </p>
-          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => navigate('/notes')}
-              className="btn btn-primary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.55rem 1.15rem',
-                fontSize: '0.85rem',
-                fontWeight: 600
-              }}
-            >
-              <Plus size={15} /> New Note
-            </button>
-            <button
-              onClick={() => {
-                const searchEl = document.querySelector('.search-section-container input');
-                if (searchEl) searchEl.focus();
-              }}
-              className="btn btn-secondary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '0.45rem',
-                padding: '0.55rem 1rem',
-                fontSize: '0.85rem',
-                fontWeight: 500
-              }}
-            >
-              <Search size={14} /> Ask Memory
-            </button>
-          </div>
         </div>
 
-        {/* Beautifully sized wave animation on right with natural breathing room */}
-        <div style={{ width: '150px', height: '150px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <LottieAnimation animationData={waveAnimation} loop={true} autoplay={true} />
-        </div>
+        <button
+          onClick={() => navigate('/notes')}
+          className="btn btn-primary"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.45rem',
+            padding: '0.55rem 1rem',
+            fontSize: '0.85rem',
+            fontWeight: 500
+          }}
+        >
+          <Plus size={15} /> New Note
+        </button>
       </div>
 
       {/* 2. Clean, Minimal KPI Cards (Monochrome / Neutral Aesthetic) */}
