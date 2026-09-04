@@ -199,128 +199,138 @@ async def get_daily_briefing(
     Generates a personalized Morning/Daily Cognitive Briefing and Memory Flashback.
     """
     now = datetime.datetime.now(datetime.timezone.utc)
-    
-    # 1. Fetch pending tasks
-    pending_tasks = db.query(Task).filter(
-        Task.user_id == current_user.id,
-        Task.status == "pending"
-    ).order_by(Task.due_date.asc().nullslast(), Task.created_at.desc()).all()
-    
-    priorities = []
-    for t in pending_tasks[:4]:
-        priorities.append({
-            "id": str(t.id),
-            "description": t.description,
-            "due_date": t.due_date.isoformat() if t.due_date else None,
-            "note_id": str(t.note_id) if t.note_id else None
-        })
-        
-    # 2. Fetch stale contacts (> 3 days)
-    contacts = db.query(Contact).filter(Contact.user_id == current_user.id).all()
-    reconnect_nudge = None
-    for c in contacts:
-        interact = c.last_interaction or c.created_at
-        if interact:
-            if interact.tzinfo is None:
-                interact = interact.replace(tzinfo=datetime.timezone.utc)
-            delta = now - interact
-            if delta.days >= 3:
-                reconnect_nudge = {
-                    "id": str(c.id),
-                    "name": c.name,
-                    "role": c.role or "Contact",
-                    "context": c.context or "No recent interactions logged",
-                    "days_stale": delta.days
-                }
-                break # Pick top stale contact
-                
-    # 3. Find a Memory Flashback note (> 3 days old or random historic note)
-    all_notes = db.query(Note).filter(
-        Note.user_id == current_user.id
-    ).order_by(Note.created_at.asc()).all()
-    
-    flashback = None
-    if all_notes:
-        # Find notes older than 2 days
-        eligible = []
-        for n in all_notes:
-            if n.created_at:
-                c_date = n.created_at if n.created_at.tzinfo else n.created_at.replace(tzinfo=datetime.timezone.utc)
-                age_days = (now - c_date).days
-                if age_days >= 2:
-                    eligible.append((n, age_days))
-        
-        if eligible:
-            # Pick a memorable one (e.g. longest content or middle of timeline)
-            chosen_note, days_ago = eligible[len(eligible) // 2]
-            clean_excerpt = chosen_note.summary or chosen_note.content.replace('\n', ' ')[:180]
-            if len(chosen_note.content or "") > 180 and not chosen_note.summary:
-                clean_excerpt += "..."
-                
-            flashback = {
-                "id": str(chosen_note.id),
-                "title": chosen_note.title or "Untitled Memory",
-                "created_at": chosen_note.created_at.isoformat() if chosen_note.created_at else None,
-                "days_ago": days_ago,
-                "excerpt": clean_excerpt,
-                "tags": chosen_note.tags.split(",") if chosen_note.tags else []
-            }
-
-    # 4. Generate synthesis
     user_name = current_user.full_name.split()[0] if current_user.full_name else "there"
     
-    # Deterministic default brief
-    if priorities and reconnect_nudge:
-        headline = f"Focus on {len(priorities)} commitments & reconnect with {reconnect_nudge['name']}"
-        focus_summary = f"You have {len(priorities)} pending action items on your radar, and it's been {reconnect_nudge['days_stale']} days since your last note with {reconnect_nudge['name']}."
-    elif priorities:
-        headline = f"Focus on your top {len(priorities)} pending action items"
-        focus_summary = f"You have {len(priorities)} active commitments ready to tackle today."
-    elif reconnect_nudge:
-        headline = f"Great time to reconnect with {reconnect_nudge['name']}"
-        focus_summary = f"No pressing task deadlines right now. Consider checking in with {reconnect_nudge['name']}."
-    else:
-        headline = "Your mind is clear and up to date"
-        focus_summary = "All commitments resolved. Capture fresh thoughts or ideas as they emerge today."
-
-    spark_thoughts = [
-        "What is the single most important outcome that would make today a success?",
-        "Clarity comes from writing your thoughts down before acting on them.",
-        "Small daily consistency compounds into monumental long-term knowledge.",
-        "Your second brain works while you rest — review your past reflections to spot new patterns."
-    ]
-    import random
-    spark_thought = random.choice(spark_thoughts)
-
-    # Optional fast LLM enhancement
     try:
-        if (priorities or reconnect_nudge) and settings.GEMINI_API_KEY or settings.GROQ_API_KEY or settings.OPENROUTER_API_KEY:
-            kernel = get_kernel()
-            context_snippet = f"User name: {user_name}. Top tasks: {[p['description'] for p in priorities]}. Stale contact: {reconnect_nudge['name'] if reconnect_nudge else 'None'}."
-            ai_prompt = f"Given this context: {context_snippet}, generate a 1-sentence energizing morning briefing (max 18 words) and a punchy 5-word headline. Format: Headline: <5 words> | Summary: <18 words>"
-            ai_res = await kernel.generate_chat_completion([
-                {"role": "system", "content": "You are a thoughtful executive assistant. Be crisp and concise."},
-                {"role": "user", "content": ai_prompt}
-            ], temperature=0.5)
-            if "Headline:" in ai_res and "Summary:" in ai_res:
-                parts = ai_res.split("|")
-                h = parts[0].replace("Headline:", "").strip()
-                s = parts[1].replace("Summary:", "").strip()
-                if h: headline = h
-                if s: focus_summary = s
-    except Exception:
-        pass # Fallback cleanly to deterministic summary
+        # 1. Fetch pending tasks
+        pending_tasks = db.query(Task).filter(
+            Task.user_id == current_user.id,
+            Task.status == "pending"
+        ).order_by(Task.due_date.asc().nullslast(), Task.created_at.desc()).all()
+        
+        priorities = []
+        for t in pending_tasks[:4]:
+            source_nid = getattr(t, "source_note_id", None)
+            priorities.append({
+                "id": str(t.id),
+                "description": t.description,
+                "due_date": t.due_date.isoformat() if t.due_date else None,
+                "note_id": str(source_nid) if source_nid else None
+            })
+            
+        # 2. Fetch stale contacts (> 3 days)
+        contacts = db.query(Contact).filter(Contact.user_id == current_user.id).all()
+        reconnect_nudge = None
+        for c in contacts:
+            interact = c.last_interaction or c.created_at
+            if interact:
+                if interact.tzinfo is None:
+                    interact = interact.replace(tzinfo=datetime.timezone.utc)
+                delta = now - interact
+                if delta.days >= 3:
+                    reconnect_nudge = {
+                        "id": str(c.id),
+                        "name": c.name,
+                        "role": c.role or "Contact",
+                        "context": c.context or "No recent interactions logged",
+                        "days_stale": delta.days
+                    }
+                    break # Pick top stale contact
+                    
+        # 3. Find a Memory Flashback note (> 2 days old or historic note)
+        all_notes = db.query(Note).filter(
+            Note.user_id == current_user.id
+        ).order_by(Note.created_at.asc()).all()
+        
+        flashback = None
+        if all_notes:
+            eligible = []
+            for n in all_notes:
+                if n.created_at:
+                    c_date = n.created_at if n.created_at.tzinfo else n.created_at.replace(tzinfo=datetime.timezone.utc)
+                    age_days = (now - c_date).days
+                    if age_days >= 2:
+                        eligible.append((n, age_days))
+            
+            if eligible:
+                chosen_note, days_ago = eligible[len(eligible) // 2]
+                clean_excerpt = chosen_note.summary or (chosen_note.content or "").replace('\n', ' ')[:180]
+                if len(chosen_note.content or "") > 180 and not chosen_note.summary:
+                    clean_excerpt += "..."
+                    
+                flashback = {
+                    "id": str(chosen_note.id),
+                    "title": chosen_note.title or "Untitled Memory",
+                    "created_at": chosen_note.created_at.isoformat() if chosen_note.created_at else None,
+                    "days_ago": days_ago,
+                    "excerpt": clean_excerpt,
+                    "tags": [t.strip() for t in chosen_note.tags.split(",") if t.strip()] if chosen_note.tags else []
+                }
 
-    return {
-        "greeting": f"Good morning, {user_name}",
-        "headline": headline,
-        "focus_summary": focus_summary,
-        "priorities": priorities,
-        "reconnect_nudge": reconnect_nudge,
-        "flashback": flashback,
-        "spark_thought": spark_thought,
-        "timestamp": now.isoformat()
-    }
+        # 4. Deterministic default brief
+        if priorities and reconnect_nudge:
+            headline = f"Focus on {len(priorities)} commitments & reconnect with {reconnect_nudge['name']}"
+            focus_summary = f"You have {len(priorities)} pending action items on your radar, and it's been {reconnect_nudge['days_stale']} days since your last note with {reconnect_nudge['name']}."
+        elif priorities:
+            headline = f"Focus on your top {len(priorities)} pending action items"
+            focus_summary = f"You have {len(priorities)} active commitments ready to tackle today."
+        elif reconnect_nudge:
+            headline = f"Great time to reconnect with {reconnect_nudge['name']}"
+            focus_summary = f"No pressing task deadlines right now. Consider checking in with {reconnect_nudge['name']}."
+        else:
+            headline = "Your mind is clear and up to date"
+            focus_summary = "All commitments resolved. Capture fresh thoughts or ideas as they emerge today."
+
+        spark_thoughts = [
+            "What is the single most important outcome that would make today a success?",
+            "Clarity comes from writing your thoughts down before acting on them.",
+            "Small daily consistency compounds into monumental long-term knowledge.",
+            "Your second brain works while you rest — review your past reflections to spot new patterns."
+        ]
+        import random
+        spark_thought = random.choice(spark_thoughts)
+
+        # Optional fast LLM enhancement
+        try:
+            if (priorities or reconnect_nudge) and (settings.GEMINI_API_KEY or settings.GROQ_API_KEY or settings.OPENROUTER_API_KEY):
+                kernel = get_kernel()
+                context_snippet = f"User name: {user_name}. Top tasks: {[p['description'] for p in priorities]}. Stale contact: {reconnect_nudge['name'] if reconnect_nudge else 'None'}."
+                ai_prompt = f"Given this context: {context_snippet}, generate a 1-sentence energizing morning briefing (max 18 words) and a punchy 5-word headline. Format: Headline: <5 words> | Summary: <18 words>"
+                ai_res = await kernel.generate_chat_completion([
+                    {"role": "system", "content": "You are a thoughtful executive assistant. Be crisp and concise."},
+                    {"role": "user", "content": ai_prompt}
+                ], temperature=0.5)
+                if "Headline:" in ai_res and "Summary:" in ai_res:
+                    parts = ai_res.split("|")
+                    h = parts[0].replace("Headline:", "").strip()
+                    s = parts[1].replace("Summary:", "").strip()
+                    if h: headline = h
+                    if s: focus_summary = s
+        except Exception:
+            pass
+
+        return {
+            "greeting": f"Good morning, {user_name}",
+            "headline": headline,
+            "focus_summary": focus_summary,
+            "priorities": priorities,
+            "reconnect_nudge": reconnect_nudge,
+            "flashback": flashback,
+            "spark_thought": spark_thought,
+            "timestamp": now.isoformat()
+        }
+    except Exception as e:
+        print(f"Error formulating daily briefing: {e}")
+        return {
+            "greeting": f"Good morning, {user_name}",
+            "headline": "Welcome to your Cognitive Workspace",
+            "focus_summary": "Your memory base is ready. Capture notes or ask questions anytime.",
+            "priorities": [],
+            "reconnect_nudge": None,
+            "flashback": None,
+            "spark_thought": "Clarity comes from writing your thoughts down before acting on them.",
+            "timestamp": now.isoformat()
+        }
 
 @router.post("/transcribe")
 async def transcribe_audio(
