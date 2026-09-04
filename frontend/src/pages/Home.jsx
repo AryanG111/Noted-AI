@@ -157,7 +157,7 @@ export const Home = () => {
           const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
           const age = Date.now() - (parsed.cachedAt || 0);
           if (age < TWO_HOURS_MS) {
-            shouldFetch = false; // Still fresh!
+            shouldFetch = false; // Still fresh in localStorage
           }
         }
       } catch (e) {
@@ -166,15 +166,15 @@ export const Home = () => {
     }
 
     if (shouldFetch) {
-      fetchFreshBriefing();
+      fetchBriefing(false);
     }
   };
 
-  const fetchFreshBriefing = async () => {
+  const fetchBriefing = async (forceRefresh = false) => {
     setRefreshingBriefing(true);
     const cacheKey = `noted_daily_briefing_${user?.id || 'default'}`;
     try {
-      const res = await fetch(`${API_URL}/search/briefing`, {
+      const res = await fetch(`${API_URL}/search/briefing?force_refresh=${forceRefresh}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -184,7 +184,7 @@ export const Home = () => {
         localStorage.setItem(cacheKey, JSON.stringify(data));
       }
     } catch (err) {
-      console.warn("Unable to fetch fresh briefing:", err);
+      console.warn("Unable to fetch briefing:", err);
     } finally {
       setRefreshingBriefing(false);
     }
@@ -575,7 +575,7 @@ export const Home = () => {
           {/* Action Tools */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <button
-              onClick={fetchFreshBriefing}
+              onClick={() => fetchBriefing(true)}
               disabled={refreshingBriefing}
               title="Refresh briefing with AI"
               style={{

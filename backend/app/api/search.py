@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Header, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, Header, UploadFile, File, Query
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 import datetime
@@ -20,6 +20,10 @@ from langchain_classic.agents import AgentExecutor, create_react_agent
 from langchain_core.prompts import PromptTemplate
 from langchain_openai import ChatOpenAI
 from backend.app.services.agent_tools import get_agent_tools
+
+# In-memory briefing cache keyed by user_id: { user_id: { "data": response_dict, "timestamp": datetime_utc } }
+user_briefing_cache: Dict[str, Any] = {}
+BRIEFING_CACHE_TTL_SECONDS = 2 * 3600  # 2 hours
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -192,15 +196,27 @@ Thought:{agent_scratchpad}"""
 
 @router.get("/briefing")
 async def get_daily_briefing(
+    force_refresh: bool = Query(False),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """
     Generates a personalized Morning/Daily Cognitive Briefing and Memory Flashback.
+    Caches results per user for 2 hours to minimize LLM usage unless force_refresh=True.
     """
     now = datetime.datetime.now(datetime.timezone.utc)
+    user_key = str(current_user.id)
     user_name = current_user.full_name.split()[0] if current_user.full_name else "there"
     
+    # Check in-memory 2-hour cache if not forcing refresh
+    if not force_refresh and user_key in user_briefing_cache:
+        cached_entry = user_briefing_cache[user_key]
+        cached_time = cached_entry.get("timestamp")
+        if cached_time:
+            age_seconds = (now - cached_time).total_seconds()
+            if age_seconds < BRIEFING_CACHE_TTL_SECONDS:
+                return cached_entry.get("data")
+
     try:
         # 1. Fetch pending tasks
         pending_tasks = db.query(Task).filter(
@@ -309,7 +325,7 @@ async def get_daily_briefing(
         except Exception:
             pass
 
-        return {
+        result = {
             "greeting": f"Good morning, {user_name}",
             "headline": headline,
             "focus_summary": focus_summary,
@@ -319,6 +335,11 @@ async def get_daily_briefing(
             "spark_thought": spark_thought,
             "timestamp": now.isoformat()
         }
+        user_briefing_cache[user_key] = {
+            "data": result,
+            "timestamp": now
+        }
+        return result
     except Exception as e:
         print(f"Error formulating daily briefing: {e}")
         return {
