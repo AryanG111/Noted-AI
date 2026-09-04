@@ -3,6 +3,12 @@ import httpx
 import sys
 import os
 import uuid
+from dotenv import load_dotenv
+
+# Explicitly load backend .env file
+backend_env_path = os.path.join(os.path.dirname(__file__), ".env")
+if os.path.exists(backend_env_path):
+    load_dotenv(backend_env_path)
 
 # Adjust path so backend imports resolve if needed
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
