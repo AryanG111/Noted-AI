@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     OLLAMA_EMBED_MODEL: str = "nomic-embed-text"
     
     GEMINI_MODEL: str = "gemma-4-26b-a4b-it"
-    GROQ_MODEL: str = "llama3-8b-8192"
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
     OPENROUTER_MODEL: str = "openai/gpt-4o"
     
     class Config:

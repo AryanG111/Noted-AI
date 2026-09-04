@@ -116,7 +116,7 @@ async def ask_noted(
             llm = ChatOpenAI(
                 base_url="https://api.groq.com/openai/v1",
                 api_key=settings.GROQ_API_KEY,
-                model="gemma2-9b-it",
+                model=settings.GROQ_MODEL or "llama-3.3-70b-versatile",
                 temperature=0.0
             )
         elif provider == "openrouter":
