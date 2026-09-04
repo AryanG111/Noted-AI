@@ -5,7 +5,6 @@ import {
   Play, 
   Pause, 
   RotateCcw, 
-  Compass, 
   ArrowRight, 
   Search, 
   ExternalLink, 
@@ -44,7 +43,7 @@ export const Graph = () => {
   const [pathfindingMode, setPathfindingMode] = useState(false);
   const [pathStart, setPathStart] = useState(null);
   const [pathTarget, setPathTarget] = useState(null);
-  const [discoveredPath, setDiscoveredPath] = useState(null); // Array of node IDs in path
+  const [discoveredPath, setDiscoveredPath] = useState(null);
 
   // Canvas, Transform & Interaction References
   const canvasRef = useRef(null);
@@ -83,20 +82,19 @@ export const Graph = () => {
           current: maxTime === minTime ? maxTime + 1000 : maxTime
         });
 
-        // Compute wide initial distributed layout
+        // Initialize positions centered gracefully at 100% scale
         const total = Math.max(1, json.nodes.length);
         const nodes = json.nodes.map((node, idx) => {
-          // Distinct angle with multiple ring layers for spacious natural distribution
-          const ring = idx % 3;
-          const ringRadius = 180 + ring * 140;
-          const angle = (idx / total) * 2 * Math.PI + (ring * 0.4);
+          const ring = idx % 2;
+          const ringRadius = 150 + ring * 90;
+          const angle = (idx / total) * 2 * Math.PI + (ring * 0.5);
           
           return {
             ...node,
-            x: 600 + Math.cos(angle) * ringRadius,
-            y: 380 + Math.sin(angle) * ringRadius,
-            vx: (Math.random() - 0.5) * 2,
-            vy: (Math.random() - 0.5) * 2,
+            x: 480 + Math.cos(angle) * ringRadius,
+            y: 300 + Math.sin(angle) * ringRadius,
+            vx: 0,
+            vy: 0,
             radius: node.type === 'note' ? 24 : node.type === 'contact' ? 22 : 20,
             timestampNum: node.created_at ? new Date(node.created_at).getTime() : Date.now()
           };
@@ -156,7 +154,6 @@ export const Graph = () => {
       return;
     }
 
-    // Build adjacency list
     const adj = {};
     activeNodes.forEach(n => { adj[n.id] = []; });
     activeEdges.forEach(e => {
@@ -210,12 +207,13 @@ export const Graph = () => {
     };
   }, [isPlayingEvolution]);
 
-  // Reset / Center View on Load
+  // Center Graph with 100% scale default
   const handleFitView = useCallback(() => {
     if (!canvasRef.current || activeNodes.length === 0) return;
     const canvas = canvasRef.current;
-    const width = canvas.width;
-    const height = canvas.height;
+    const rect = canvas.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
 
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     activeNodes.forEach(n => {
@@ -225,11 +223,13 @@ export const Graph = () => {
       if (n.y > maxY) maxY = n.y;
     });
 
-    const padding = 120;
+    const padding = 80;
     const graphW = Math.max(100, maxX - minX + padding * 2);
     const graphH = Math.max(100, maxY - minY + padding * 2);
 
-    const scale = Math.min(1.4, Math.max(0.45, Math.min(width / graphW, height / graphH)));
+    // Keep natural 100% scale if possible, only slightly scaling if needed
+    const autoScale = Math.min(width / graphW, height / graphH);
+    const scale = Math.min(1.15, Math.max(0.85, autoScale));
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
 
@@ -241,37 +241,39 @@ export const Graph = () => {
     setZoomLevel(scale);
   }, [activeNodes]);
 
-  // Spread / Shuffle Layout
+  // Reset Center & Layout
   const handleRelayout = () => {
     if (!canvasRef.current || activeNodes.length === 0) return;
-    const width = canvasRef.current.width || 900;
-    const height = canvasRef.current.height || 600;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const width = rect.width || 800;
+    const height = rect.height || 550;
     const total = activeNodes.length;
 
     activeNodes.forEach((node, idx) => {
-      const ring = idx % 3;
-      const r = 200 + ring * 140;
-      const angle = (idx / total) * 2 * Math.PI + Math.random() * 0.3;
+      const ring = idx % 2;
+      const r = 160 + ring * 90;
+      const angle = (idx / total) * 2 * Math.PI + (ring * 0.4);
       node.x = width / 2 + Math.cos(angle) * r;
       node.y = height / 2 + Math.sin(angle) * r;
       node.vx = 0;
       node.vy = 0;
     });
-    handleFitView();
+
+    transformRef.current = { x: 0, y: 0, k: 1 };
+    setZoomLevel(1);
   };
 
   // Zoom Helpers
   const handleZoom = (delta) => {
     if (!canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const width = canvas.width;
-    const height = canvas.height;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const width = rect.width;
+    const height = rect.height;
     const centerScreen = { x: width / 2, y: height / 2 };
 
     const oldK = transformRef.current.k;
-    const newK = Math.min(2.5, Math.max(0.35, oldK * (1 + delta)));
+    const newK = Math.min(2.5, Math.max(0.5, oldK * (1 + delta)));
 
-    // Zoom centered on canvas viewport
     const wx = (centerScreen.x - transformRef.current.x) / oldK;
     const wy = (centerScreen.y - transformRef.current.y) / oldK;
 
@@ -281,7 +283,7 @@ export const Graph = () => {
     setZoomLevel(newK);
   };
 
-  // Simulation & Canvas Rendering Loop
+  // Simulation & High-DPI (Retina) Canvas Rendering Loop
   useEffect(() => {
     if (loading || activeNodes.length === 0 || !canvasRef.current) return;
     
@@ -289,30 +291,31 @@ export const Graph = () => {
     const ctx = canvas.getContext('2d');
     let animationFrameId;
 
-    // Initial view alignment once canvas dimensions resolve
     if (!isInitializedRef.current && canvas.clientWidth > 0) {
-      canvas.width = canvas.clientWidth;
-      canvas.height = canvas.clientHeight;
       isInitializedRef.current = true;
       handleFitView();
     }
 
     const runSimulation = () => {
       const rect = canvas.getBoundingClientRect();
-      if (canvas.width !== Math.floor(rect.width) || canvas.height !== Math.floor(rect.height)) {
-        canvas.width = Math.floor(rect.width);
-        canvas.height = Math.floor(rect.height);
+      const dpr = Math.max(1, window.devicePixelRatio || 1);
+      const displayWidth = Math.floor(rect.width);
+      const displayHeight = Math.floor(rect.height);
+
+      // High-DPI Canvas Resolution Buffer
+      if (canvas.width !== displayWidth * dpr || canvas.height !== displayHeight * dpr) {
+        canvas.width = displayWidth * dpr;
+        canvas.height = displayHeight * dpr;
       }
-      const width = canvas.width;
-      const height = canvas.height;
+
       const nodes = activeNodes;
       const edges = activeEdges;
 
       // 1. Force Simulation Physics (Spacious, Anti-Colliding)
-      const kRepel = 28000;
-      const kAttract = 0.015;
-      const targetLinkDist = 200;
-      const gravity = 0.0006;
+      const kRepel = 24000;
+      const kAttract = 0.02;
+      const targetLinkDist = 180;
+      const gravity = 0.0005;
       const damping = 0.82;
 
       // Repulsion between all node pairs
@@ -325,7 +328,7 @@ export const Graph = () => {
           const distSq = dx * dx + dy * dy + 0.1;
           const dist = Math.sqrt(distSq);
           
-          if (dist < 600) {
+          if (dist < 480) {
             const force = kRepel / distSq;
             const fx = (dx / dist) * force;
             const fy = (dy / dist) * force;
@@ -340,8 +343,8 @@ export const Graph = () => {
             }
           }
 
-          // HARD COLLISION BUFFER: Prevent overlapping badges & pills (minimum 135px spacing)
-          const minSeparation = 135;
+          // HARD COLLISION BUFFER (125px minimum spacing prevents overlapping labels)
+          const minSeparation = 125;
           if (dist < minSeparation) {
             const overlap = (minSeparation - dist) * 0.45;
             const nx = dx / (dist || 1);
@@ -386,37 +389,33 @@ export const Graph = () => {
       // Position update & gentle centering
       nodes.forEach(node => {
         if (node === dragNodeRef.current) return;
-        node.vx += (width / 2 - node.x) * gravity;
-        node.vy += (height / 2 - node.y) * gravity;
+        node.vx += (displayWidth / 2 - node.x) * gravity;
+        node.vy += (displayHeight / 2 - node.y) * gravity;
         node.x += node.vx;
         node.y += node.vy;
         node.vx *= damping;
         node.vy *= damping;
       });
 
-      // 2. Draw Canvas Background & Grid
-      ctx.clearRect(0, 0, width, height);
+      // 2. High-DPI Context Reset & Clear
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.scale(dpr, dpr); // Scale for crystal clear rendering on all Retina/4K displays
 
-      // Grid in screen space with transform
+      // Background Subtle Dot Grid
       const t = transformRef.current;
       ctx.save();
-      ctx.strokeStyle = '#F1EFEA';
-      ctx.lineWidth = 0.6;
+      ctx.fillStyle = '#E5E4DE';
       const gridSize = 32 * t.k;
       const startX = (t.x % gridSize);
       const startY = (t.y % gridSize);
 
-      for (let x = startX; x < width; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
-        ctx.stroke();
-      }
-      for (let y = startY; y < height; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
+      for (let x = startX; x < displayWidth; x += gridSize) {
+        for (let y = startY; y < displayHeight; y += gridSize) {
+          ctx.beginPath();
+          ctx.arc(x, y, 1.2, 0, 2 * Math.PI);
+          ctx.fill();
+        }
       }
       ctx.restore();
 
@@ -440,28 +439,28 @@ export const Graph = () => {
           cx /= cNodes.length;
           cy /= cNodes.length;
 
-          let maxDist = 50;
+          let maxDist = 45;
           cNodes.forEach(n => {
             const d = Math.sqrt((n.x - cx) ** 2 + (n.y - cy) ** 2);
             if (d > maxDist) maxDist = d;
           });
 
-          // Soft Glowing Aura
+          // Soft Glowing Cluster Aura
           ctx.save();
-          const haloGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, maxDist + 65);
+          const haloGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, maxDist + 55);
           if (cName.includes('People') || cNodes[0].type === 'contact') {
-            haloGrad.addColorStop(0, 'rgba(2, 132, 199, 0.08)');
+            haloGrad.addColorStop(0, 'rgba(2, 132, 199, 0.09)');
             haloGrad.addColorStop(1, 'rgba(2, 132, 199, 0)');
           } else if (cName.includes('Action') || cNodes[0].type === 'task') {
-            haloGrad.addColorStop(0, 'rgba(16, 185, 129, 0.08)');
+            haloGrad.addColorStop(0, 'rgba(16, 185, 129, 0.09)');
             haloGrad.addColorStop(1, 'rgba(16, 185, 129, 0)');
           } else {
-            haloGrad.addColorStop(0, 'rgba(109, 93, 252, 0.08)');
+            haloGrad.addColorStop(0, 'rgba(109, 93, 252, 0.09)');
             haloGrad.addColorStop(1, 'rgba(109, 93, 252, 0)');
           }
 
           ctx.beginPath();
-          ctx.arc(cx, cy, maxDist + 65, 0, 2 * Math.PI);
+          ctx.arc(cx, cy, maxDist + 55, 0, 2 * Math.PI);
           ctx.fillStyle = haloGrad;
           ctx.fill();
           ctx.restore();
@@ -483,18 +482,18 @@ export const Graph = () => {
           ctx.lineTo(targetNode.x, targetNode.y);
 
           if (isPathEdge) {
-            ctx.strokeStyle = '#F59E0B'; // Glowing Gold for Shortest Path
-            ctx.lineWidth = 3.5 / t.k;
+            ctx.strokeStyle = '#F59E0B';
+            ctx.lineWidth = 3.5 / Math.sqrt(t.k);
             ctx.stroke();
           } else {
-            ctx.strokeStyle = pathSet ? 'rgba(209, 208, 202, 0.3)' : '#D6D3CD';
+            ctx.strokeStyle = pathSet ? 'rgba(209, 208, 202, 0.35)' : '#D1D0CA';
             ctx.lineWidth = 1.4 / Math.sqrt(t.k);
             ctx.stroke();
           }
         }
       });
 
-      // 5. Draw Nodes & Labels
+      // 5. Draw Nodes & Crisp Badges
       nodes.forEach(node => {
         const isSel = selectedNodeRef.current && node.id === selectedNodeRef.current.id;
         const isHovered = hoveredNodeRef.current && node.id === hoveredNodeRef.current.id;
@@ -507,9 +506,9 @@ export const Graph = () => {
         // Path / Selection Ring
         if (isPathNode || isSel || isHovered) {
           ctx.beginPath();
-          ctx.arc(node.x, node.y, node.radius + (isPathNode ? 10 : 8), 0, 2 * Math.PI);
+          ctx.arc(node.x, node.y, node.radius + (isPathNode ? 10 : 7), 0, 2 * Math.PI);
           ctx.strokeStyle = isPathNode 
-            ? 'rgba(245, 158, 11, 0.5)' 
+            ? 'rgba(245, 158, 11, 0.55)' 
             : isSel 
               ? 'rgba(109, 93, 252, 0.45)' 
               : 'rgba(0,0,0,0.12)';
@@ -517,7 +516,7 @@ export const Graph = () => {
           ctx.stroke();
         }
 
-        // Distinct Colors
+        // Distinct Type Theme
         let fillStyle = '#F5F3FF';
         let strokeStyle = '#6D5DFC';
         let badgeBorder = '#DDD6FE';
@@ -537,8 +536,8 @@ export const Graph = () => {
 
         // Node Circle Body with soft shadow
         ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,0.06)';
-        ctx.shadowBlur = 8;
+        ctx.shadowColor = 'rgba(0,0,0,0.08)';
+        ctx.shadowBlur = 6;
         ctx.shadowOffsetY = 2;
         ctx.beginPath();
         ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
@@ -557,7 +556,7 @@ export const Graph = () => {
         ctx.textBaseline = 'middle';
         ctx.fillText(emoji, node.x, node.y + 0.5);
 
-        // Node Label Pill
+        // Crisp Node Label Pill
         const labelText = node.label || 'Untitled';
         const displayLabel = labelText.length > 22 ? labelText.slice(0, 20) + '...' : labelText;
         ctx.font = '600 11px Inter, -apple-system, BlinkMacSystemFont, sans-serif';
@@ -566,11 +565,11 @@ export const Graph = () => {
         const pillW = textWidth + 16;
         const pillH = 19;
         const pillX = node.x - pillW / 2;
-        const pillY = node.y + node.radius + 5;
+        const pillY = node.y + node.radius + 4;
 
         // Pill shadow & background
         ctx.save();
-        ctx.shadowColor = 'rgba(0,0,0,0.08)';
+        ctx.shadowColor = 'rgba(0,0,0,0.06)';
         ctx.shadowBlur = 4;
         ctx.shadowOffsetY = 1;
         ctx.fillStyle = '#FFFFFF';
@@ -591,7 +590,7 @@ export const Graph = () => {
         ctx.restore();
       });
 
-      ctx.restore(); // Restore transform
+      ctx.restore();
 
       animationFrameId = requestAnimationFrame(runSimulation);
     };
@@ -647,7 +646,6 @@ export const Graph = () => {
       dragNodeRef.current = clickedNode;
       nodeOffsetRef.current = { x: clickedNode.x - worldPos.x, y: clickedNode.y - worldPos.y };
     } else {
-      // Pan canvas background
       isPanningRef.current = true;
       panStartRef.current = {
         x: screenX - transformRef.current.x,
@@ -683,7 +681,6 @@ export const Graph = () => {
     isPanningRef.current = false;
   };
 
-  // Mouse wheel zoom
   const handleWheel = (e) => {
     e.preventDefault();
     const canvas = canvasRef.current;
@@ -692,9 +689,9 @@ export const Graph = () => {
     const screenX = e.clientX - rect.left;
     const screenY = e.clientY - rect.top;
 
-    const zoomFactor = e.deltaY < 0 ? 1.12 : 0.88;
+    const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
     const oldK = transformRef.current.k;
-    const newK = Math.min(2.5, Math.max(0.35, oldK * zoomFactor));
+    const newK = Math.min(2.5, Math.max(0.5, oldK * zoomFactor));
 
     const worldPos = screenToWorld(screenX, screenY);
     transformRef.current.k = newK;
@@ -743,7 +740,6 @@ export const Graph = () => {
 
         {/* Filter Pills & Pathfinding Action Button */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
-          {/* Type Filter */}
           <div style={{ display: 'flex', backgroundColor: 'var(--warm-bg)', padding: '0.2rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
             {['all', 'note', 'contact', 'task'].map(type => (
               <button
@@ -767,7 +763,6 @@ export const Graph = () => {
             ))}
           </div>
 
-          {/* Pathfinding Toggle */}
           <button
             onClick={() => {
               setPathfindingMode(!pathfindingMode);
@@ -935,7 +930,7 @@ export const Graph = () => {
             </button>
             <button
               onClick={handleRelayout}
-              title="Spread Layout"
+              title="Reset Layout & Center"
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', padding: '0.25rem', display: 'flex', alignItems: 'center' }}
             >
               <RefreshCw size={13} />
@@ -959,7 +954,6 @@ export const Graph = () => {
             overflowY: 'auto',
             boxShadow: '0 8px 24px rgba(0,0,0,0.06)'
           }}>
-            {/* Drawer Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
               <div>
                 <span style={{ 
@@ -983,7 +977,6 @@ export const Graph = () => {
               </button>
             </div>
 
-            {/* Snippet / Description */}
             <div style={{
               fontSize: '0.82rem',
               color: 'var(--text-secondary)',
@@ -996,7 +989,6 @@ export const Graph = () => {
               {selectedNode.summary || selectedNode.context || selectedNode.description || 'No detailed preview available.'}
             </div>
 
-            {/* Quick Action Navigation Button */}
             <button
               onClick={() => {
                 if (selectedNode.type === 'note') {
@@ -1021,7 +1013,6 @@ export const Graph = () => {
               Open in {selectedNode.type === 'note' ? 'Notes Editor' : selectedNode.type === 'contact' ? 'Contacts' : 'Tasks'} <ExternalLink size={13} />
             </button>
 
-            {/* Connected Neighbors List */}
             <div>
               <span style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
                 Direct Connections ({getConnections().length})
@@ -1084,7 +1075,6 @@ export const Graph = () => {
         gap: '1.25rem',
         flexWrap: 'wrap'
       }}>
-        {/* Play/Pause Button */}
         <button
           onClick={() => {
             if (timeRange.current >= timeRange.max) {
@@ -1110,7 +1100,6 @@ export const Graph = () => {
           <span>{isPlayingEvolution ? 'Pause' : 'Play Evolution'}</span>
         </button>
 
-        {/* Timeline Range Scrubber */}
         <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <span style={{ fontSize: '0.7rem', color: 'var(--text-secondary)', fontWeight: 500, whiteSpace: 'nowrap' }}>
             {formatScrubberDate(timeRange.min)}
@@ -1137,7 +1126,6 @@ export const Graph = () => {
           </span>
         </div>
 
-        {/* Reset to Today Button */}
         <button
           onClick={() => {
             setIsPlayingEvolution(false);
