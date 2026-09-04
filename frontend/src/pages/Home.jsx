@@ -28,6 +28,7 @@ import ReactMarkdown from 'react-markdown';
 import loaderAnimation from '../assets/loader.json';
 import successAnimation from '../assets/success.json';
 import emptyAnimation from '../assets/empty.json';
+import waveAnimation from '../assets/wave.json';
 
 export const Home = () => {
   const { token, activeKernel, user } = useAuth();
@@ -318,9 +319,14 @@ export const Home = () => {
           }}>
             {formattedDate}
           </div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)', margin: 0 }}>
-            Good morning, {user?.full_name?.split(' ')[0] || 'Aryan'}.
-          </h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <div style={{ width: '38px', height: '38px', flexShrink: 0 }}>
+              <LottieAnimation animationData={waveAnimation} loop={true} autoplay={true} />
+            </div>
+            <h1 style={{ fontSize: '1.75rem', fontWeight: 600, letterSpacing: '-0.02em', color: 'var(--text-primary)', margin: 0 }}>
+              Good morning, {user?.full_name?.split(' ')[0] || 'Aryan'}.
+            </h1>
+          </div>
         </div>
 
         <button
