@@ -7,10 +7,10 @@ class GroqAdapter(LLMKernelAdapter):
     def __init__(self):
         self.api_key = settings.GROQ_API_KEY
         self.models_fallback_chain = [
-            settings.GROQ_MODEL or "llama-3.3-70b-versatile",
-            "llama-3.3-70b-versatile",
-            "llama-3.1-8b-instant",
-            "mixtral-8x7b-32768"
+            settings.GROQ_MODEL or "openai/gpt-oss-120b",
+            "openai/gpt-oss-120b",
+            "openai/gpt-oss-20b",
+            "qwen/qwen3.8-27b"
         ]
         self.models_fallback_chain = list(dict.fromkeys(self.models_fallback_chain))
         self.client = httpx.AsyncClient(timeout=60.0)
