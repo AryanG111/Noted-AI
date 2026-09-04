@@ -69,7 +69,7 @@ def get_memory_graph(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Returns nodes and edges of the memory knowledge graph for rendering.
+    Returns rich nodes and edges of the memory knowledge graph with timestamps and clusters.
     """
     from backend.app.models.relation import Relationship
     
@@ -79,10 +79,16 @@ def get_memory_graph(
     # 1. Gather Notes
     notes = db.query(Note).filter(Note.user_id == current_user.id).all()
     for note in notes:
+        tag_list = [t.strip() for t in note.tags.split(",") if t.strip()] if note.tags else []
+        cluster = tag_list[0] if tag_list else "Knowledge Notes"
         nodes.append({
             "id": str(note.id),
             "label": note.title or "Untitled Note",
-            "type": "note"
+            "type": "note",
+            "cluster": cluster,
+            "created_at": note.created_at.isoformat() if note.created_at else None,
+            "summary": note.summary or (note.content[:140] + "..." if len(note.content or "") > 140 else note.content),
+            "tags": tag_list
         })
         
     # 2. Gather Contacts
@@ -91,7 +97,11 @@ def get_memory_graph(
         nodes.append({
             "id": str(contact.id),
             "label": contact.name,
-            "type": "contact"
+            "type": "contact",
+            "cluster": "People & Network",
+            "created_at": (contact.last_interaction or contact.created_at).isoformat() if (contact.last_interaction or contact.created_at) else None,
+            "role": contact.role or "Contact",
+            "context": contact.context or "No contextual notes yet"
         })
         
     # 3. Gather Tasks
@@ -99,8 +109,13 @@ def get_memory_graph(
     for task in tasks:
         nodes.append({
             "id": str(task.id),
-            "label": task.description[:25] + "..." if len(task.description) > 25 else task.description,
-            "type": "task"
+            "label": task.description[:28] + "..." if len(task.description) > 28 else task.description,
+            "type": "task",
+            "cluster": "Action Commitments",
+            "created_at": task.created_at.isoformat() if task.created_at else None,
+            "status": task.status,
+            "due_date": task.due_date.isoformat() if task.due_date else None,
+            "description": task.description
         })
         
     # 4. Gather Relationships
@@ -109,7 +124,8 @@ def get_memory_graph(
         edges.append({
             "source": str(rel.source_id),
             "target": str(rel.target_id),
-            "label": rel.relation_type
+            "label": rel.relation_type,
+            "created_at": rel.created_at.isoformat() if getattr(rel, "created_at", None) else None
         })
         
     return {"nodes": nodes, "edges": edges}
