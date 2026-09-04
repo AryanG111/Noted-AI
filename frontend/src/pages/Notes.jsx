@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { useAuth, API_URL } from '../context/AuthContext';
+import { useAuth, API_URL, handleApiResponse } from '../context/AuthContext';
 import { SparkleDoodle } from '../components/DoodleIllustrations';
 import { Plus, Trash2, Calendar, User, Check, CheckSquare, ArrowLeft, Sparkles, Mic, MicOff, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -100,26 +100,21 @@ export const Notes = () => {
       const response = await fetch(`${API_URL}/notes`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setNotes(data);
-        if (data.length > 0) {
-          if (selectId) {
-            const found = data.find(n => n.id === selectId);
-            if (found) handleSelectNote(found);
-          } else if (!selectedNote) {
-            handleSelectNote(data[0]);
-          }
-        } else {
-          setSelectedNote(null);
+      const data = await handleApiResponse(response, 'Unable to load notes.');
+      setNotes(data || []);
+      if (data && data.length > 0) {
+        if (selectId) {
+          const found = data.find(n => n.id === selectId);
+          if (found) handleSelectNote(found);
+        } else if (!selectedNote) {
+          handleSelectNote(data[0]);
         }
       } else {
-        const err = await response.json().catch(() => ({}));
-        setError(err.detail || `Failed to fetch notes (HTTP ${response.status})`);
+        setSelectedNote(null);
       }
     } catch (error) {
       console.error('Error fetching notes:', error);
-      setError(error.message || "Connection error to server");
+      setError(error.message || "There's something wrong on our side. Please try again in a moment.");
     }
   };
 
@@ -146,27 +141,21 @@ export const Notes = () => {
         },
         body: JSON.stringify({ title: 'Untitled Note', content: 'Start writing...' })
       });
-      if (response.ok) {
-        const newNote = await response.json();
-        await fetchNotes(newNote.id);
-        setMobileView('editor');
-        if (newNote.error) {
-          setError(newNote.error);
-          setProcessing(false);
-        } else {
-          setError('');
-          if (!newNote.is_processing) {
-            setProcessing(false);
-          }
-        }
-      } else {
-        const err = await response.json().catch(() => ({}));
-        setError(err.detail || `Failed to create note (HTTP ${response.status})`);
+      const newNote = await handleApiResponse(response, 'Unable to create note.');
+      await fetchNotes(newNote.id);
+      setMobileView('editor');
+      if (newNote.error) {
+        setError(newNote.error);
         setProcessing(false);
+      } else {
+        setError('');
+        if (!newNote.is_processing) {
+          setProcessing(false);
+        }
       }
     } catch (error) {
       console.error('Error creating note:', error);
-      setError(error.message || "Connection error to server");
+      setError(error.message || "There's something wrong on our side. Please try again in a moment.");
       setProcessing(false);
     } finally {
       setCreating(false);
@@ -183,22 +172,18 @@ export const Notes = () => {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        if (selectedNote?.id === id) {
-          setSelectedNote(null);
-          setTitle('');
-          setContent('');
-          latestTitleRef.current = '';
-          latestContentRef.current = '';
-        }
-        await fetchNotes();
-      } else {
-        const err = await response.json().catch(() => ({}));
-        setError(err.detail || `Failed to delete note (HTTP ${response.status})`);
+      await handleApiResponse(response, 'Unable to delete note.');
+      if (selectedNote?.id === id) {
+        setSelectedNote(null);
+        setTitle('');
+        setContent('');
+        latestTitleRef.current = '';
+        latestContentRef.current = '';
       }
+      await fetchNotes();
     } catch (error) {
       console.error('Error deleting note:', error);
-      setError(error.message || "Connection error to server");
+      setError(error.message || "There's something wrong on our side. Please try again in a moment.");
     } finally {
       setDeletingId(null);
     }
@@ -225,38 +210,31 @@ export const Notes = () => {
           },
           body: JSON.stringify({ title: newTitle, content: newContent })
         });
-        if (response.ok) {
-          const updated = await response.json();
-          // Update selected note with pipeline results, preserving newer keystrokes
-          setSelectedNote(prev => ({
-            ...updated,
-            title: latestTitleRef.current,
-            content: latestContentRef.current
-          }));
-          if (updated.error) {
-            setError(updated.error);
-            setSavingStatus('Saved (Ingestion Error)');
-            setProcessing(false);
-          } else {
-            setError('');
-            setSavingStatus('Remembered!');
-            if (!updated.is_processing) {
-              setProcessing(false);
-            }
-          }
-          // Refresh note list in background
-          const listResponse = await fetch(`${API_URL}/notes`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          });
-          if (listResponse.ok) {
-            const listData = await listResponse.json();
-            setNotes(listData);
-          }
-        } else {
-          const err = await response.json().catch(() => ({}));
-          setError(err.detail || `Auto-save failed (HTTP ${response.status})`);
-          setSavingStatus('Error saving');
+        const updated = await handleApiResponse(response, 'Auto-save failed.');
+        // Update selected note with pipeline results, preserving newer keystrokes
+        setSelectedNote(prev => ({
+          ...updated,
+          title: latestTitleRef.current,
+          content: latestContentRef.current
+        }));
+        if (updated.error) {
+          setError(updated.error);
+          setSavingStatus('Saved (Ingestion Error)');
           setProcessing(false);
+        } else {
+          setError('');
+          setSavingStatus('Remembered!');
+          if (!updated.is_processing) {
+            setProcessing(false);
+          }
+        }
+        // Refresh note list in background
+        const listResponse = await fetch(`${API_URL}/notes`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (listResponse.ok) {
+          const listData = await listResponse.json();
+          setNotes(listData);
         }
       } catch (error) {
         console.error('Error auto-saving note:', error);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth, API_URL } from '../context/AuthContext';
+import { useAuth, API_URL, handleApiResponse } from '../context/AuthContext';
 import { EmptyTasksDoodle } from '../components/DoodleIllustrations';
 import { CheckSquare, Trash2, Calendar, Square, Plus } from 'lucide-react';
 
@@ -19,16 +19,11 @@ export const Tasks = () => {
       const response = await fetch(`${API_URL}/tasks`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setTasks(data);
-      } else {
-        const err = await response.json().catch(() => ({}));
-        setError(err.detail || `Failed to fetch tasks (HTTP ${response.status})`);
-      }
+      const data = await handleApiResponse(response, 'Unable to load tasks.');
+      setTasks(data || []);
     } catch (error) {
       console.error('Error fetching tasks:', error);
-      setError(error.message || "Connection error to server");
+      setError(error.message || "There's something wrong on our side. Please try again in a moment.");
     } finally {
       setLoading(false);
     }
@@ -45,15 +40,11 @@ export const Tasks = () => {
         },
         body: JSON.stringify({ status: nextStatus })
       });
-      if (response.ok) {
-        fetchTasks();
-      } else {
-        const err = await response.json().catch(() => ({}));
-        setError(err.detail || `Failed to update task status (HTTP ${response.status})`);
-      }
+      await handleApiResponse(response, 'Unable to update task status.');
+      fetchTasks();
     } catch (error) {
       console.error('Error updating task status:', error);
-      setError(error.message || "Connection error to server");
+      setError(error.message || "There's something wrong on our side. Please try again in a moment.");
     }
   };
 
@@ -64,15 +55,11 @@ export const Tasks = () => {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        fetchTasks();
-      } else {
-        const err = await response.json().catch(() => ({}));
-        setError(err.detail || `Failed to delete task (HTTP ${response.status})`);
-      }
+      await handleApiResponse(response, 'Unable to delete task.');
+      fetchTasks();
     } catch (error) {
       console.error('Error deleting task:', error);
-      setError(error.message || "Connection error to server");
+      setError(error.message || "There's something wrong on our side. Please try again in a moment.");
     }
   };
 
@@ -88,16 +75,12 @@ export const Tasks = () => {
         },
         body: JSON.stringify({ description: newTaskDesc.trim(), status: 'pending' })
       });
-      if (response.ok) {
-        setNewTaskDesc('');
-        fetchTasks();
-      } else {
-        const err = await response.json().catch(() => ({}));
-        setError(err.detail || `Failed to create task (HTTP ${response.status})`);
-      }
+      await handleApiResponse(response, 'Unable to create task.');
+      setNewTaskDesc('');
+      fetchTasks();
     } catch (error) {
       console.error('Error creating manual task:', error);
-      setError(error.message || "Connection error to server");
+      setError(error.message || "There's something wrong on our side. Please try again in a moment.");
     }
   };
 

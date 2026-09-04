@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth, API_URL } from '../context/AuthContext';
+import { useAuth, API_URL, handleApiResponse } from '../context/AuthContext';
 import { 
   Search, 
   Send, 
@@ -264,17 +264,12 @@ export const Home = () => {
         body: JSON.stringify({ query: chatQuery.trim() })
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        setChatResponse(data.answer);
-        setCitations(data.citations || []);
-      } else {
-        const err = await response.json().catch(() => ({}));
-        setError(err.detail || `Recall failed (HTTP ${response.status})`);
-      }
+      const data = await handleApiResponse(response, 'Unable to process search query.');
+      setChatResponse(data.answer);
+      setCitations(data.citations || []);
     } catch (err) {
       console.error(err);
-      setError("Unable to reach your local AI model.");
+      setError(err.message || "There's something wrong on our side. Please try again in a moment.");
     } finally {
       clearTimeout(status1);
       clearTimeout(status2);
@@ -302,33 +297,11 @@ export const Home = () => {
           marginBottom: '2rem',
           border: '1px solid #FAD2CF',
           display: 'flex',
-          flexDirection: 'column',
-          gap: '0.5rem'
+          justifyContent: 'space-between',
+          alignItems: 'center'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontWeight: 500 }}>Unable to reach your local AI model.</span>
-            <button onClick={() => setError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red-accent)', fontWeight: 600 }}>✕</button>
-          </div>
-          <div style={{ fontSize: '0.8rem', color: '#D32F2F' }}>
-            Ollama isn't responding right now.
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginTop: '0.25rem' }}>
-            <button onClick={() => { setError(''); fetchDashboardData(); }} style={{
-              backgroundColor: 'var(--red-accent)',
-              color: '#FFFFFF',
-              border: 'none',
-              borderRadius: 'var(--radius-sm)',
-              padding: '0.25rem 0.75rem',
-              fontSize: '0.75rem',
-              cursor: 'pointer',
-              fontWeight: 500
-            }}>
-              Retry
-            </button>
-            <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-              Ollama · Local kernel
-            </span>
-          </div>
+          <span>{error}</span>
+          <button onClick={() => setError('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--red-accent)', fontWeight: 600 }}>✕</button>
         </div>
       )}
 

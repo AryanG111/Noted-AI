@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth, API_URL } from '../context/AuthContext';
+import { useAuth, API_URL, handleApiResponse } from '../context/AuthContext';
 import { ShieldCheck, UserX, Check, Trash2, Search, RefreshCw, UserCheck, Clock, AlertCircle } from 'lucide-react';
 
 export const Admin = () => {
@@ -25,15 +25,10 @@ export const Admin = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setError(err.detail || 'Failed to load users');
-      }
+      const data = await handleApiResponse(res, 'Failed to load users.');
+      setUsers(data || []);
     } catch (e) {
-      setError(e.message || 'Connection error');
+      setError(e.message || "There's something wrong on our side. Please try again in a moment.");
     } finally {
       setLoading(false);
     }
@@ -52,17 +47,12 @@ export const Admin = () => {
         },
         body: JSON.stringify({ status: newStatus })
       });
-      if (res.ok) {
-        const updated = await res.json();
-        setUsers(prev => prev.map(u => u.id === userId ? updated : u));
-        setActionSuccess(`User '${updated.email}' has been set to ${newStatus}.`);
-        setTimeout(() => setActionSuccess(''), 3000);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setError(err.detail || 'Failed to update user status');
-      }
+      const updated = await handleApiResponse(res, 'Failed to update user status.');
+      setUsers(prev => prev.map(u => u.id === userId ? updated : u));
+      setActionSuccess(`User '${updated.email}' has been set to ${newStatus}.`);
+      setTimeout(() => setActionSuccess(''), 3000);
     } catch (e) {
-      setError(e.message || 'Connection error');
+      setError(e.message || "There's something wrong on our side. Please try again in a moment.");
     } finally {
       setUpdatingId(null);
     }
@@ -82,16 +72,12 @@ export const Admin = () => {
           'Authorization': `Bearer ${token}`
         }
       });
-      if (res.ok) {
-        setUsers(prev => prev.filter(u => u.id !== userId));
-        setActionSuccess(`User '${email}' and all associated data deleted.`);
-        setTimeout(() => setActionSuccess(''), 3000);
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setError(err.detail || 'Failed to delete user');
-      }
+      await handleApiResponse(res, 'Failed to delete user.');
+      setUsers(prev => prev.filter(u => u.id !== userId));
+      setActionSuccess(`User '${email}' and all associated data deleted.`);
+      setTimeout(() => setActionSuccess(''), 3000);
     } catch (e) {
-      setError(e.message || 'Connection error');
+      setError(e.message || "There's something wrong on our side. Please try again in a moment.");
     } finally {
       setUpdatingId(null);
     }

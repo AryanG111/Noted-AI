@@ -8,7 +8,7 @@ from uuid import UUID
 from backend.app.core.db import get_db
 from backend.app.core.security import get_password_hash, verify_password, create_access_token, decode_access_token
 from backend.app.models.user import User
-from backend.app.schemas.user import UserCreate, UserResponse, Token
+from backend.app.schemas.user import UserCreate, UserLogin, UserResponse, Token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -95,7 +95,7 @@ def login_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Ses
     return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/login", response_model=Token)
-def login_json(user_in: UserCreate, db: Session = Depends(get_db)):
+def login_json(user_in: UserLogin, db: Session = Depends(get_db)):
     """Alternate JSON login endpoint (useful for modern SPA applications)."""
     user = db.query(User).filter(User.email == user_in.email).first()
     if not user or not verify_password(user_in.password, user.hashed_password):

@@ -4,6 +4,41 @@ const AuthContext = createContext(null);
 
 export const API_URL = import.meta.env.VITE_API_URL || '/api';
 
+/**
+ * Universal safe API response handler that converts HTTP status codes
+ * and JSON/text payloads into user-friendly messages with zero raw stack traces.
+ */
+export const handleApiResponse = async (response, fallbackMsg = "There's something wrong on our side. Please try again in a moment.") => {
+  if (response.ok) {
+    if (response.status === 204) return null;
+    return await response.json().catch(() => ({}));
+  }
+
+  let userFriendlyMsg = fallbackMsg;
+  try {
+    const errorData = await response.json();
+    if (typeof errorData.detail === 'string') {
+      userFriendlyMsg = errorData.detail;
+    } else if (Array.isArray(errorData.detail)) {
+      userFriendlyMsg = errorData.detail.map(d => d.msg || d.message).join('; ');
+    } else if (errorData.message) {
+      userFriendlyMsg = errorData.message;
+    }
+  } catch {
+    if (response.status >= 500) {
+      userFriendlyMsg = "There's something wrong on our side. Please try again in a moment.";
+    } else if (response.status === 404) {
+      userFriendlyMsg = "The requested item could not be found.";
+    } else if (response.status === 401) {
+      userFriendlyMsg = "Your session has expired. Please sign in again.";
+    } else if (response.status === 403) {
+      userFriendlyMsg = "You do not have permission to perform this action.";
+    }
+  }
+
+  throw new Error(userFriendlyMsg);
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(localStorage.getItem('token'));
@@ -30,7 +65,7 @@ export const AuthProvider = ({ children }) => {
           logout();
         }
       } catch (error) {
-        console.error('Error fetching user:', error);
+        console.warn('Authentication validation notice:', error);
       } finally {
         setLoading(false);
       }
@@ -44,17 +79,13 @@ export const AuthProvider = ({ children }) => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email: email.trim().toLowerCase(), password })
     });
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Login failed');
-    }
-    
-    const data = await response.json();
+    const data = await handleApiResponse(response, 'Incorrect email or password.');
     localStorage.setItem('token', data.access_token);
     setToken(data.access_token);
+    return data;
   };
 
   const register = async (email, password, fullName, occupation, aiTone) => {
@@ -64,19 +95,15 @@ export const AuthProvider = ({ children }) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        email,
+        email: email.trim().toLowerCase(),
         password,
-        full_name: fullName,
-        occupation,
-        ai_tone: aiTone
+        full_name: fullName?.trim() || null,
+        occupation: occupation?.trim() || null,
+        ai_tone: aiTone || 'balanced'
       })
     });
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.detail || 'Registration failed');
-    }
-    return await response.json();
+    return await handleApiResponse(response, 'Unable to complete registration. Please check your information.');
   };
 
   const logout = () => {
@@ -88,7 +115,6 @@ export const AuthProvider = ({ children }) => {
   const updateKernel = (kernelName) => {
     localStorage.setItem('activeKernel', kernelName);
     setActiveKernel(kernelName);
-    // Note: In Phase 2/3, we can optionally synchronize this active kernel with a backend settings endpoint.
   };
 
   return (

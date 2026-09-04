@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth, API_URL } from '../context/AuthContext';
+import { useAuth, API_URL, handleApiResponse } from '../context/AuthContext';
 import { Clock, FileText, User, CheckSquare } from 'lucide-react';
 
 export const Timeline = () => {
@@ -17,16 +17,11 @@ export const Timeline = () => {
       const response = await fetch(`${API_URL}/timeline`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setEvents(data);
-      } else {
-        const err = await response.json().catch(() => ({}));
-        setError(err.detail || `Failed to fetch timeline (HTTP ${response.status})`);
-      }
+      const data = await handleApiResponse(response, 'Unable to load timeline.');
+      setEvents(data || []);
     } catch (error) {
       console.error('Error fetching timeline:', error);
-      setError(error.message || "Connection error to server");
+      setError(error.message || "There's something wrong on our side. Please try again in a moment.");
     } finally {
       setLoading(false);
     }

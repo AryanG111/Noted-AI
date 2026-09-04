@@ -1,20 +1,20 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from uuid import UUID
 from datetime import datetime
 from typing import Optional
 
 class ContactBase(BaseModel):
-    name: str
-    role: Optional[str] = None
-    context: Optional[str] = None
+    name: str = Field(..., min_length=1, max_length=150)
+    role: Optional[str] = Field(None, max_length=150)
+    context: Optional[str] = Field(None, max_length=5000)
 
 class ContactCreate(ContactBase):
     pass
 
 class ContactUpdate(BaseModel):
-    name: Optional[str] = None
-    role: Optional[str] = None
-    context: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=150)
+    role: Optional[str] = Field(None, max_length=150)
+    context: Optional[str] = Field(None, max_length=5000)
     last_interaction: Optional[datetime] = None
 
 class ContactResponse(ContactBase):

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth, API_URL } from '../context/AuthContext';
+import { useAuth, API_URL, handleApiResponse } from '../context/AuthContext';
 import { EmptyContactsDoodle } from '../components/DoodleIllustrations';
 import { User, FileText, CheckSquare, Edit3, Save, Trash2, ArrowLeft } from 'lucide-react';
 
@@ -28,24 +28,19 @@ export const Contacts = () => {
       const response = await fetch(`${API_URL}/contacts`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setContacts(data);
-        if (data.length > 0) {
-          if (selectId) {
-            const found = data.find(c => c.id === selectId);
-            if (found) handleSelectContact(found);
-          } else if (!selectedContact) {
-            handleSelectContact(data[0]);
-          }
+      const data = await handleApiResponse(response, 'Unable to load contacts.');
+      setContacts(data || []);
+      if (data && data.length > 0) {
+        if (selectId) {
+          const found = data.find(c => c.id === selectId);
+          if (found) handleSelectContact(found);
+        } else if (!selectedContact) {
+          handleSelectContact(data[0]);
         }
-      } else {
-        const err = await response.json().catch(() => ({}));
-        setError(err.detail || `Failed to fetch contacts (HTTP ${response.status})`);
       }
     } catch (error) {
       console.error('Error fetching contacts:', error);
-      setError(error.message || "Connection error to server");
+      setError(error.message || "There's something wrong on our side. Please try again in a moment.");
     } finally {
       setLoading(false);
     }
@@ -63,19 +58,14 @@ export const Contacts = () => {
       const response = await fetch(`${API_URL}/contacts/${contact.id}/memories`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        const data = await response.json();
-        setMemories({
-          notes: data.notes || [],
-          tasks: data.tasks || []
-        });
-      } else {
-        const err = await response.json().catch(() => ({}));
-        setError(err.detail || `Failed to fetch contact memories (HTTP ${response.status})`);
-      }
+      const data = await handleApiResponse(response, 'Unable to load contact memories.');
+      setMemories({
+        notes: data?.notes || [],
+        tasks: data?.tasks || []
+      });
     } catch (error) {
       console.error('Error fetching contact memories:', error);
-      setError(error.message || "Connection error to server");
+      setError(error.message || "There's something wrong on our side. Please try again in a moment.");
     }
   };
 
@@ -91,19 +81,14 @@ export const Contacts = () => {
         },
         body: JSON.stringify({ role, context })
       });
-      if (response.ok) {
-        const updated = await response.json();
-        setSelectedContact(updated);
-        setIsEditing(false);
-        // Refresh contact list in sidebar
-        await fetchContacts(updated.id);
-      } else {
-        const err = await response.json().catch(() => ({}));
-        setError(err.detail || `Failed to update contact (HTTP ${response.status})`);
-      }
+      const updated = await handleApiResponse(response, 'Unable to update contact.');
+      setSelectedContact(updated);
+      setIsEditing(false);
+      // Refresh contact list in sidebar
+      await fetchContacts(updated.id);
     } catch (error) {
       console.error('Error updating contact:', error);
-      setError(error.message || "Connection error to server");
+      setError(error.message || "There's something wrong on our side. Please try again in a moment.");
     } finally {
       setSaving(false);
     }
@@ -120,21 +105,17 @@ export const Contacts = () => {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (response.ok) {
-        setSelectedContact(null);
-        // Refresh contact list in sidebar
-        const remaining = contacts.filter(c => c.id !== selectedContact.id);
-        setContacts(remaining);
-        if (remaining.length > 0) {
-          handleSelectContact(remaining[0]);
-        }
-      } else {
-        const err = await response.json().catch(() => ({}));
-        setError(err.detail || `Failed to delete contact (HTTP ${response.status})`);
+      await handleApiResponse(response, 'Unable to delete contact.');
+      setSelectedContact(null);
+      // Refresh contact list in sidebar
+      const remaining = contacts.filter(c => c.id !== selectedContact.id);
+      setContacts(remaining);
+      if (remaining.length > 0) {
+        handleSelectContact(remaining[0]);
       }
     } catch (error) {
       console.error('Error deleting contact:', error);
-      setError(error.message || "Connection error to server");
+      setError(error.message || "There's something wrong on our side. Please try again in a moment.");
     } finally {
       setDeleting(false);
     }

@@ -23,10 +23,33 @@ export const Login = () => {
     e.preventDefault();
     setError('');
     setSuccessMessage('');
+
+    const cleanEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!cleanEmail || !emailRegex.test(cleanEmail)) {
+      setError('Please enter a valid email address.');
+      return;
+    }
+
+    if (!password) {
+      setError('Password is required.');
+      return;
+    }
+
+    if (isRegister && password.length < 8) {
+      setError('Password must be at least 8 characters long.');
+      return;
+    }
+
+    if (isRegister && (!fullName || !fullName.trim())) {
+      setError('Please enter your full name.');
+      return;
+    }
+
     setLoading(true);
     try {
       if (isRegister) {
-        const newUser = await register(email, password, fullName, occupation, aiTone);
+        const newUser = await register(cleanEmail, password, fullName.trim(), occupation, aiTone);
         if (newUser && newUser.status === 'pending') {
           setSuccessMessage('Registration request submitted! Your account is currently pending administrator approval before you can log in.');
         } else {
@@ -35,7 +58,7 @@ export const Login = () => {
         setIsRegister(false);
         setPassword(''); // Clear password for security
       } else {
-        await login(email, password);
+        await login(cleanEmail, password);
       }
     } catch (err) {
       setError(err.message || 'An error occurred during authentication');
