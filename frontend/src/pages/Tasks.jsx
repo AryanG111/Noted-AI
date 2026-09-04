@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAuth, API_URL, handleApiResponse } from '../context/AuthContext';
 import { EmptyTasksDoodle } from '../components/DoodleIllustrations';
 import { CheckSquare, Trash2, Calendar, Square, Plus } from 'lucide-react';
-import LottieAnimation from '../components/LottieAnimation';
-import businessTaskAnimation from '../assets/Business Task Management.json';
 
 export const Tasks = () => {
   const { token } = useAuth();
@@ -155,26 +153,8 @@ export const Tasks = () => {
       </form>
 
       {tasks.length === 0 ? (
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '3rem 1.5rem',
-          border: '1.5px dashed var(--border-color)',
-          borderRadius: 'var(--radius-lg)',
-          backgroundColor: 'var(--warm-bg)',
-          textAlign: 'center'
-        }}>
-          <div style={{ width: '220px', height: '220px', marginBottom: '1rem' }}>
-            <LottieAnimation animationData={businessTaskAnimation} loop={true} autoplay={true} />
-          </div>
-          <h3 style={{ fontSize: '1.15rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>
-            No action items currently tracked
-          </h3>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', maxWidth: '380px', margin: 0 }}>
-            Commitments extracted automatically from your notes or added manually will appear here.
-          </p>
+        <div style={{ border: '1px dashed var(--border-color)', borderRadius: 'var(--radius-lg)', backgroundColor: 'var(--warm-bg)' }}>
+          <EmptyTasksDoodle />
         </div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
