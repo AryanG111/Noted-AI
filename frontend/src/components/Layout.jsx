@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTutorial } from '../context/TutorialContext';
+import { GuidedTourModal } from './GuidedTourModal';
+import { TabGuideModal } from './TabGuideModal';
 import { 
   Home, 
   FileText, 
@@ -465,6 +467,8 @@ export const Layout = ({ children }) => {
 
       {/* Main Content Area */}
       <main className="main-content">
+        <GuidedTourModal />
+        <TabGuideModal />
         {children}
       </main>
 

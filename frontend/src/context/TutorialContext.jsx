@@ -144,18 +144,24 @@ export const TutorialProvider = ({ children }) => {
   const [isTabGuideOpen, setIsTabGuideOpen] = useState(false);
   const [activeGuideRoute, setActiveGuideRoute] = useState(null);
 
-  // Check if first-time user (force tour on first login)
+  // Check if first-time user (force tour on first dashboard entry, never on /login)
   useEffect(() => {
+    if (location.pathname === '/login') {
+      setIsTourActive(false);
+      return;
+    }
     const hasSeenTour = localStorage.getItem('noted_tour_completed');
     if (!hasSeenTour) {
       // Delay slightly for smooth page load
       const timer = setTimeout(() => {
-        setIsTourActive(true);
-        setCurrentStepIndex(0);
+        if (window.location.pathname !== '/login') {
+          setIsTourActive(true);
+          setCurrentStepIndex(0);
+        }
       }, 600);
       return () => clearTimeout(timer);
     }
-  }, []);
+  }, [location.pathname]);
 
   const startTour = (forceFromBeginning = true) => {
     if (forceFromBeginning) {

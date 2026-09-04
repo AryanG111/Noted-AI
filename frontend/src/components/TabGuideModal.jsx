@@ -1,11 +1,13 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTutorial } from '../context/TutorialContext';
 import { Lightbulb, X, Sparkles, HelpCircle, CheckCircle2 } from 'lucide-react';
 
 export const TabGuideModal = () => {
+  const location = useLocation();
   const { isTabGuideOpen, closeTabGuide, currentTabHelp, startTour } = useTutorial();
 
-  if (!isTabGuideOpen) return null;
+  if (!isTabGuideOpen || location.pathname === '/login') return null;
 
   return (
     <div 

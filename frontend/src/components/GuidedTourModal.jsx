@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTutorial } from '../context/TutorialContext';
 import { Lightbulb, ArrowRight, ArrowLeft, X, CheckCircle, Sparkles } from 'lucide-react';
 
 export const GuidedTourModal = () => {
+  const location = useLocation();
   const { 
     isTourActive, 
     currentStepIndex, 
@@ -17,7 +19,7 @@ export const GuidedTourModal = () => {
   const [highlightRect, setHighlightRect] = useState(null);
 
   useEffect(() => {
-    if (!isTourActive) {
+    if (!isTourActive || location.pathname === '/login') {
       setHighlightRect(null);
       return;
     }
@@ -48,7 +50,7 @@ export const GuidedTourModal = () => {
     };
   }, [isTourActive, currentStepIndex, currentStep]);
 
-  if (!isTourActive) return null;
+  if (!isTourActive || location.pathname === '/login') return null;
 
   const isLastStep = currentStepIndex === totalSteps - 1;
 

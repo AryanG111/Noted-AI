@@ -3,8 +3,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TutorialProvider } from './context/TutorialContext';
 import { Layout } from './components/Layout';
-import { GuidedTourModal } from './components/GuidedTourModal';
-import { TabGuideModal } from './components/TabGuideModal';
 import { Login } from './pages/Login';
 import { Home } from './pages/Home';
 import { Notes } from './pages/Notes';
@@ -46,11 +44,8 @@ const ProtectedRoute = ({ children, requireAdmin = false }) => {
 
 function AppRoutes() {
   return (
-    <>
-      <GuidedTourModal />
-      <TabGuideModal />
-      <Routes>
-        <Route path="/login" element={<Login />} />
+    <Routes>
+      <Route path="/login" element={<Login />} />
         <Route path="/" element={<ProtectedRoute><Home /></ProtectedRoute>} />
         <Route path="/notes" element={<ProtectedRoute><Notes /></ProtectedRoute>} />
         <Route path="/timeline" element={<ProtectedRoute><Timeline /></ProtectedRoute>} />
@@ -61,7 +56,6 @@ function AppRoutes() {
         {/* Fallback route */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </>
   );
 }
 
