@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { SparkleDoodle } from '../components/DoodleIllustrations';
-import { Plus, Trash2, Calendar, User, Check, CheckSquare, ArrowLeft, Sparkles } from 'lucide-react';
+import { Plus, Trash2, Calendar, User, Check, CheckSquare, ArrowLeft, Sparkles, Mic, MicOff, Square } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import LottieAnimation from '../components/LottieAnimation';
 import loaderAnimation from '../assets/loader.json';
@@ -21,6 +21,14 @@ export const Notes = () => {
   const [creating, setCreating] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [mobileView, setMobileView] = useState('list'); // 'list' | 'editor' | 'insights'
+
+  // Voice Note Recording State
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [transcribing, setTranscribing] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const timerRef = useRef(null);
   
   const saveTimeoutRef = useRef(null);
 
@@ -276,6 +284,107 @@ export const Notes = () => {
     triggerAutoSave(latestTitleRef.current, val);
   };
 
+  // Cleanup audio tracks and timer on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+    };
+  }, []);
+
+  const formatRecordingTime = (secs) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, '0');
+    const s = (secs % 60).toString().padStart(2, '0');
+    return `${m}:${s}`;
+  };
+
+  const startRecording = async () => {
+    try {
+      setError('');
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setError("Audio recording is not supported in this browser.");
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        stream.getTracks().forEach(track => track.stop());
+        await handleTranscribeBlob(audioBlob);
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingDuration(0);
+      timerRef.current = setInterval(() => {
+        setRecordingDuration(prev => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Mic access error:", err);
+      setError("Microphone permission denied or audio device unavailable.");
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    setIsRecording(false);
+  };
+
+  const handleTranscribeBlob = async (blob) => {
+    setTranscribing(true);
+    setSavingStatus('Transcribing voice note...');
+    try {
+      const formData = new FormData();
+      formData.append('file', blob, 'recording.webm');
+
+      const response = await fetch(`${API_URL}/search/transcribe`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const transcribedText = data.text;
+        if (transcribedText) {
+          const currentText = latestContentRef.current || '';
+          const newContent = currentText ? `${currentText}\n\n${transcribedText}` : transcribedText;
+          setContent(newContent);
+          latestContentRef.current = newContent;
+          triggerAutoSave(latestTitleRef.current, newContent);
+          setSavingStatus('Transcribed & Remembered!');
+        }
+      } else {
+        const err = await response.json().catch(() => ({}));
+        setError(err.detail || 'Voice transcription failed.');
+      }
+    } catch (err) {
+      console.error("Transcription error:", err);
+      setError("Unable to reach voice transcription service.");
+    } finally {
+      setTranscribing(false);
+    }
+  };
+
   return (
     <div className="notes-container">
       {/* 1. Left List Panel */}
@@ -451,25 +560,97 @@ export const Notes = () => {
                 <Sparkles size={13} /> AI Insights
               </button>
             </div>
-            {/* Header / Save Indicators */}
+            {/* Header / Save Indicators & Voice Controls */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              padding: '0.75rem 2rem',
+              padding: '0.65rem 2rem',
               borderBottom: '1px solid var(--border-color)',
-              flexShrink: 0
+              flexShrink: 0,
+              gap: '1rem',
+              flexWrap: 'wrap'
             }}>
-              <span className="doodle-text" style={{ fontSize: '0.85rem', color: 'var(--purple-accent)' }}>
-                {savingStatus && (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                    {savingStatus}
-                  </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <span className="doodle-text" style={{ fontSize: '0.85rem', color: 'var(--purple-accent)' }}>
+                  {savingStatus && (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                      {savingStatus}
+                    </span>
+                  )}
+                </span>
+              </div>
+
+              {/* Voice Capture & Auto-save status */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                {isRecording ? (
+                  <button
+                    onClick={stopRecording}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      padding: '0.3rem 0.75rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      backgroundColor: '#FEE2E2',
+                      color: 'var(--red-accent)',
+                      border: '1px solid #FCA5A5',
+                      borderRadius: '100px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <span style={{
+                      width: '8px',
+                      height: '8px',
+                      borderRadius: '50%',
+                      backgroundColor: 'var(--red-accent)'
+                    }} />
+                    <span>Recording ({formatRecordingTime(recordingDuration)}) • Stop & Transcribe</span>
+                  </button>
+                ) : transcribing ? (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.35rem',
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.75rem',
+                    color: 'var(--purple-accent)',
+                    backgroundColor: '#EDE9FE',
+                    borderRadius: '100px'
+                  }}>
+                    <span className="spinner" style={{ width: '10px', height: '10px', border: '2px solid var(--purple-accent)', borderTopColor: 'transparent' }} />
+                    <span>Transcribing with Whisper...</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={startRecording}
+                    title="Record voice note with Groq Whisper"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.28rem 0.65rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      color: 'var(--text-secondary)',
+                      backgroundColor: 'var(--warm-bg)',
+                      border: '1px solid var(--border-color)',
+                      borderRadius: '100px',
+                      cursor: 'pointer',
+                      transition: 'var(--transition)'
+                    }}
+                    className="note-mention-card"
+                  >
+                    <Mic size={13} style={{ color: 'var(--purple-accent)' }} />
+                    <span>Voice Note</span>
+                  </button>
                 )}
-              </span>
-              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
-                Auto-saves as you type
-              </span>
+
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>
+                  Auto-saves
+                </span>
+              </div>
             </div>
 
             {error && (

@@ -11,9 +11,16 @@ import {
   Zap, 
   Users, 
   Brain, 
-  Plus,
-  Compass,
-  Lightbulb
+  Plus, 
+  Compass, 
+  Lightbulb,
+  Sun,
+  Moon,
+  History,
+  Calendar,
+  CheckCircle2,
+  MessageSquare,
+  ExternalLink
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import LottieAnimation from '../components/LottieAnimation';
@@ -44,26 +51,26 @@ export const Home = () => {
   const [notesCount, setNotesCount] = useState(0);
   const [recentNotes, setRecentNotes] = useState([]);
   const [allContacts, setAllContacts] = useState([]);
-  const [proactiveReminder, setProactiveReminder] = useState(() => {
+  const [briefingTab, setBriefingTab] = useState('briefing'); // 'briefing' | 'flashback'
+  const [briefingData, setBriefingData] = useState(() => {
     try {
-      const cacheKey = `noted_proactive_reminder_${user?.id || 'default'}`;
+      const cacheKey = `noted_daily_briefing_${user?.id || 'default'}`;
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
-        const parsed = JSON.parse(cached);
-        return parsed?.reminder || '';
+        return JSON.parse(cached);
       }
     } catch {
       // ignore
     }
-    return '';
+    return null;
   });
-  const [refreshingReminder, setRefreshingReminder] = useState(false);
+  const [refreshingBriefing, setRefreshingBriefing] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (token) {
       fetchDashboardData();
-      checkAndFetchProactiveReminder();
+      checkAndFetchBriefing();
     }
   }, [token]);
 
@@ -137,55 +144,49 @@ export const Home = () => {
     }
   };
 
-  const checkAndFetchProactiveReminder = () => {
-    const cacheKey = `noted_proactive_reminder_${user?.id || 'default'}`;
+  const checkAndFetchBriefing = () => {
+    const cacheKey = `noted_daily_briefing_${user?.id || 'default'}`;
     let shouldFetch = true;
     const cached = localStorage.getItem(cacheKey);
 
     if (cached) {
       try {
         const parsed = JSON.parse(cached);
-        if (parsed && typeof parsed.reminder === 'string') {
-          setProactiveReminder(parsed.reminder);
-          const THREE_HOURS_MS = 3 * 60 * 60 * 1000;
-          const age = Date.now() - (parsed.timestamp || 0);
-          if (age < THREE_HOURS_MS) {
+        if (parsed && typeof parsed === 'object') {
+          setBriefingData(parsed);
+          const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+          const age = Date.now() - (parsed.cachedAt || 0);
+          if (age < TWO_HOURS_MS) {
             shouldFetch = false; // Still fresh!
           }
         }
       } catch (e) {
-        console.warn("Failed to parse cached proactive reminder", e);
+        console.warn("Failed to parse cached briefing", e);
       }
     }
 
     if (shouldFetch) {
-      fetchFreshProactiveReminder();
+      fetchFreshBriefing();
     }
   };
 
-  const fetchFreshProactiveReminder = async () => {
-    setRefreshingReminder(true);
-    const cacheKey = `noted_proactive_reminder_${user?.id || 'default'}`;
+  const fetchFreshBriefing = async () => {
+    setRefreshingBriefing(true);
+    const cacheKey = `noted_daily_briefing_${user?.id || 'default'}`;
     try {
-      const reminderRes = await fetch(`${API_URL}/search/proactive`, {
+      const res = await fetch(`${API_URL}/search/briefing`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      if (reminderRes.ok) {
-        const reminderData = await reminderRes.json();
-        const text = reminderData.reminder || '';
-        setProactiveReminder(text);
-        localStorage.setItem(cacheKey, JSON.stringify({
-          reminder: text,
-          timestamp: Date.now()
-        }));
-      } else {
-        const err = await reminderRes.json().catch(() => ({}));
-        console.warn(err.detail || `Failed to fetch reminders (HTTP ${reminderRes.status})`);
+      if (res.ok) {
+        const data = await res.json();
+        data.cachedAt = Date.now();
+        setBriefingData(data);
+        localStorage.setItem(cacheKey, JSON.stringify(data));
       }
     } catch (err) {
-      console.warn("Unable to fetch fresh proactive reminder:", err);
+      console.warn("Unable to fetch fresh briefing:", err);
     } finally {
-      setRefreshingReminder(false);
+      setRefreshingBriefing(false);
     }
   };
 
@@ -496,56 +497,312 @@ export const Home = () => {
         </div>
       </div>
 
-      {/* Proactive Reminder (Subtle/Quiet Notification with Stale Cache & 3-hour TTL) */}
-      {proactiveReminder && (
+      {/* 2.5. Interactive Daily Cognitive Briefing & Memory Flashback */}
+      <div style={{
+        marginBottom: '2.5rem',
+        border: '1px solid var(--border-color)',
+        borderRadius: 'var(--radius-lg)',
+        backgroundColor: '#FFFFFF',
+        padding: '1.25rem 1.5rem',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+        position: 'relative'
+      }}>
+        {/* Top Header: Tabs & Refresh */}
         <div style={{
-          marginBottom: '2.5rem',
-          border: '1px dashed #D1D5DB',
-          borderRadius: 'var(--radius-sm)',
-          backgroundColor: 'var(--warm-bg)',
-          padding: '1rem 1.25rem',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          borderBottom: '1px solid var(--border-color)',
+          paddingBottom: '0.85rem',
+          marginBottom: '1rem',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
-            <h4 style={{ 
-              fontSize: '0.7rem', 
-              fontWeight: 600, 
-              letterSpacing: '0.05em', 
-              color: 'var(--text-primary)', 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '0.375rem', 
-              textTransform: 'uppercase', 
-              margin: 0 
-            }}>
-              <Sparkles size={11} /> Attention Needed
-            </h4>
-            
+          {/* Tab Switcher */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <button
-              onClick={fetchFreshProactiveReminder}
-              disabled={refreshingReminder}
-              title="Refresh reminder"
+              onClick={() => setBriefingTab('briefing')}
+              style={{
+                background: briefingTab === 'briefing' ? 'var(--text-primary)' : 'var(--warm-bg)',
+                color: briefingTab === 'briefing' ? '#FFFFFF' : 'var(--text-secondary)',
+                border: 'none',
+                borderRadius: '100px',
+                padding: '0.35rem 0.85rem',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                transition: 'var(--transition)'
+              }}
+            >
+              {new Date().getHours() < 17 ? <Sun size={13} /> : <Moon size={13} />}
+              <span>{new Date().getHours() < 17 ? 'Daily Briefing' : 'Evening Reflection'}</span>
+            </button>
+
+            <button
+              onClick={() => setBriefingTab('flashback')}
+              style={{
+                background: briefingTab === 'flashback' ? 'var(--text-primary)' : 'var(--warm-bg)',
+                color: briefingTab === 'flashback' ? '#FFFFFF' : 'var(--text-secondary)',
+                border: 'none',
+                borderRadius: '100px',
+                padding: '0.35rem 0.85rem',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                transition: 'var(--transition)'
+              }}
+            >
+              <History size={13} />
+              <span>Memory Flashback</span>
+              {briefingData?.flashback && (
+                <span style={{
+                  width: '6px',
+                  height: '6px',
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--purple-accent)',
+                  marginLeft: '2px'
+                }} />
+              )}
+            </button>
+          </div>
+
+          {/* Action Tools */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <button
+              onClick={fetchFreshBriefing}
+              disabled={refreshingBriefing}
+              title="Refresh briefing with AI"
               style={{
                 background: 'none',
                 border: 'none',
-                cursor: refreshingReminder ? 'not-allowed' : 'pointer',
+                cursor: refreshingBriefing ? 'not-allowed' : 'pointer',
                 color: 'var(--text-secondary)',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.25rem',
-                fontSize: '0.7rem',
-                padding: '0.15rem 0.35rem',
+                gap: '0.35rem',
+                fontSize: '0.75rem',
+                padding: '0.2rem 0.45rem',
                 borderRadius: 'var(--radius-sm)'
               }}
             >
-              <RotateCw size={11} className={refreshingReminder ? 'spinner' : ''} />
-              <span>{refreshingReminder ? 'Checking...' : 'Refresh'}</span>
+              <RotateCw size={12} className={refreshingBriefing ? 'spinner' : ''} />
+              <span>{refreshingBriefing ? 'Synthesizing...' : 'Refresh'}</span>
             </button>
           </div>
-          <p style={{ fontSize: '0.875rem', color: 'var(--text-primary)', lineHeight: '1.4', margin: 0 }}>
-            {proactiveReminder}
-          </p>
         </div>
-      )}
+
+        {/* Tab 1: Daily Briefing Content */}
+        {briefingTab === 'briefing' && (
+          <div>
+            {/* Headline & Executive Summary */}
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ 
+                fontSize: '0.95rem', 
+                fontWeight: 600, 
+                color: 'var(--text-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                marginBottom: '0.3rem'
+              }}>
+                <Sparkles size={14} style={{ color: 'var(--purple-accent)' }} />
+                <span>{briefingData?.headline || "Your Daily Overview"}</span>
+              </div>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.45', margin: 0 }}>
+                {briefingData?.focus_summary || "Scanning your memory base for active commitments and people to reconnect with."}
+              </p>
+            </div>
+
+            {/* Top Priorities Action Items */}
+            {briefingData?.priorities && briefingData.priorities.length > 0 && (
+              <div style={{ marginBottom: '1rem' }}>
+                <div style={{ 
+                  fontSize: '0.7rem', 
+                  fontWeight: 600, 
+                  textTransform: 'uppercase', 
+                  letterSpacing: '0.06em', 
+                  color: 'var(--text-secondary)',
+                  marginBottom: '0.5rem' 
+                }}>
+                  Key Action Items
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
+                  {briefingData.priorities.map((task) => (
+                    <div 
+                      key={task.id}
+                      onClick={() => navigate('/tasks')}
+                      style={{
+                        padding: '0.65rem 0.85rem',
+                        borderRadius: 'var(--radius-sm)',
+                        backgroundColor: 'var(--warm-bg)',
+                        border: '1px solid var(--border-color)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        cursor: 'pointer',
+                        transition: 'var(--transition)'
+                      }}
+                      className="note-mention-card"
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
+                        <CheckSquare size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                        <span style={{ 
+                          fontSize: '0.8rem', 
+                          fontWeight: 500, 
+                          color: 'var(--text-primary)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {task.description}
+                        </span>
+                      </div>
+                      <ArrowRight size={12} style={{ color: 'var(--text-secondary)', flexShrink: 0, marginLeft: '0.25rem' }} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Reconnect Nudge */}
+            {briefingData?.reconnect_nudge && (
+              <div style={{
+                backgroundColor: 'rgba(237, 233, 254, 0.4)',
+                border: '1px solid #DDD6FE',
+                borderRadius: 'var(--radius-sm)',
+                padding: '0.75rem 1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '0.5rem',
+                marginBottom: '1rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <Users size={15} style={{ color: 'var(--purple-accent)', flexShrink: 0 }} />
+                  <div>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      Follow up with {briefingData.reconnect_nudge.name}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginLeft: '0.4rem' }}>
+                      ({briefingData.reconnect_nudge.days_stale} days since last interaction)
+                    </span>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.1rem' }}>
+                      {briefingData.reconnect_nudge.context}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate('/contacts')}
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    border: '1px solid #C4B5FD',
+                    color: 'var(--purple-accent)',
+                    borderRadius: 'var(--radius-sm)',
+                    padding: '0.3rem 0.65rem',
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    cursor: 'pointer'
+                  }}
+                >
+                  View Contact
+                </button>
+              </div>
+            )}
+
+            {/* Spark Thought */}
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.45rem', 
+              fontSize: '0.78rem', 
+              color: 'var(--text-secondary)',
+              fontStyle: 'italic',
+              borderTop: '1px dashed var(--border-color)',
+              paddingTop: '0.65rem'
+            }}>
+              <Lightbulb size={13} style={{ color: '#F59E0B', flexShrink: 0 }} />
+              <span>{briefingData?.spark_thought || "What is the single most important outcome that would make today a success?"}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Tab 2: Memory Flashback Content */}
+        {briefingTab === 'flashback' && (
+          <div>
+            {briefingData?.flashback ? (
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--purple-accent)', marginBottom: '0.2rem' }}>
+                      🕰️ Memory from {briefingData.flashback.days_ago} days ago
+                    </div>
+                    <h3 style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
+                      {briefingData.flashback.title}
+                    </h3>
+                  </div>
+
+                  <button
+                    onClick={() => navigate('/notes', { state: { selectedNoteId: briefingData.flashback.id } })}
+                    className="btn btn-primary"
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                      padding: '0.35rem 0.75rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 600
+                    }}
+                  >
+                    Open in Notes <ExternalLink size={12} />
+                  </button>
+                </div>
+
+                <p style={{
+                  fontSize: '0.85rem',
+                  lineHeight: '1.5',
+                  color: 'var(--text-primary)',
+                  backgroundColor: 'var(--warm-bg)',
+                  padding: '0.85rem 1rem',
+                  borderRadius: 'var(--radius-sm)',
+                  border: '1px solid var(--border-color)',
+                  margin: '0.75rem 0'
+                }}>
+                  "{briefingData.flashback.excerpt}"
+                </p>
+
+                {briefingData.flashback.tags && briefingData.flashback.tags.length > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                    {briefingData.flashback.tags.map((tag, idx) => (
+                      <span key={idx} style={{
+                        fontSize: '0.7rem',
+                        color: 'var(--text-secondary)',
+                        backgroundColor: '#FFFFFF',
+                        border: '1px solid var(--border-color)',
+                        padding: '0.15rem 0.5rem',
+                        borderRadius: '100px'
+                      }}>
+                        #{tag.trim()}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ padding: '1rem 0', color: 'var(--text-secondary)', fontSize: '0.85rem', textAlign: 'center' }}>
+                <History size={20} style={{ margin: '0 auto 0.5rem auto', opacity: 0.5, display: 'block' }} />
+                <span>As your second brain grows, past memories, ideas, and decisions from previous weeks will resurface here.</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* 3. Search & Ask Memory (Sleek Clean Styling with Hover Suggestions) */}
       <div className="search-section-container" style={{ marginBottom: '2.75rem' }}>
