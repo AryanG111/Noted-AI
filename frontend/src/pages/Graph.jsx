@@ -1,23 +1,20 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, API_URL } from '../context/AuthContext';
 import { 
-  HelpCircle, 
   Play, 
   Pause, 
   RotateCcw, 
   Compass, 
-  Sparkles, 
   ArrowRight, 
   Search, 
   ExternalLink, 
-  Layers, 
-  Calendar, 
   X, 
-  CheckCircle2, 
   Zap, 
-  Share2,
-  Filter
+  ZoomIn, 
+  ZoomOut, 
+  Maximize2,
+  RefreshCw
 } from 'lucide-react';
 
 export const Graph = () => {
@@ -49,12 +46,16 @@ export const Graph = () => {
   const [pathTarget, setPathTarget] = useState(null);
   const [discoveredPath, setDiscoveredPath] = useState(null); // Array of node IDs in path
 
-  // Canvas & Simulation references
+  // Canvas, Transform & Interaction References
   const canvasRef = useRef(null);
+  const transformRef = useRef({ x: 0, y: 0, k: 1 });
+  const [zoomLevel, setZoomLevel] = useState(1);
   const dragNodeRef = useRef(null);
-  const offsetRef = useRef({ x: 0, y: 0 });
-  const mousePosRef = useRef({ x: 0, y: 0 });
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef({ x: 0, y: 0 });
+  const nodeOffsetRef = useRef({ x: 0, y: 0 });
   const hoveredNodeRef = useRef(null);
+  const isInitializedRef = useRef(false);
 
   useEffect(() => {
     fetchGraphData();
@@ -82,17 +83,21 @@ export const Graph = () => {
           current: maxTime === minTime ? maxTime + 1000 : maxTime
         });
 
-        // Initialize spatial layout positions
+        // Compute wide initial distributed layout
+        const total = Math.max(1, json.nodes.length);
         const nodes = json.nodes.map((node, idx) => {
-          const angle = (idx / Math.max(1, json.nodes.length)) * 2 * Math.PI;
-          const dist = 140 + (idx % 3) * 60;
+          // Distinct angle with multiple ring layers for spacious natural distribution
+          const ring = idx % 3;
+          const ringRadius = 180 + ring * 140;
+          const angle = (idx / total) * 2 * Math.PI + (ring * 0.4);
+          
           return {
             ...node,
-            x: 350 + Math.cos(angle) * dist,
-            y: 300 + Math.sin(angle) * dist,
-            vx: 0,
-            vy: 0,
-            radius: node.type === 'note' ? 22 : node.type === 'contact' ? 20 : 18,
+            x: 600 + Math.cos(angle) * ringRadius,
+            y: 380 + Math.sin(angle) * ringRadius,
+            vx: (Math.random() - 0.5) * 2,
+            vy: (Math.random() - 0.5) * 2,
+            radius: node.type === 'note' ? 24 : node.type === 'contact' ? 22 : 20,
             timestampNum: node.created_at ? new Date(node.created_at).getTime() : Date.now()
           };
         });
@@ -205,6 +210,77 @@ export const Graph = () => {
     };
   }, [isPlayingEvolution]);
 
+  // Reset / Center View on Load
+  const handleFitView = useCallback(() => {
+    if (!canvasRef.current || activeNodes.length === 0) return;
+    const canvas = canvasRef.current;
+    const width = canvas.width;
+    const height = canvas.height;
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    activeNodes.forEach(n => {
+      if (n.x < minX) minX = n.x;
+      if (n.x > maxX) maxX = n.x;
+      if (n.y < minY) minY = n.y;
+      if (n.y > maxY) maxY = n.y;
+    });
+
+    const padding = 120;
+    const graphW = Math.max(100, maxX - minX + padding * 2);
+    const graphH = Math.max(100, maxY - minY + padding * 2);
+
+    const scale = Math.min(1.4, Math.max(0.45, Math.min(width / graphW, height / graphH)));
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    transformRef.current = {
+      k: scale,
+      x: width / 2 - centerX * scale,
+      y: height / 2 - centerY * scale
+    };
+    setZoomLevel(scale);
+  }, [activeNodes]);
+
+  // Spread / Shuffle Layout
+  const handleRelayout = () => {
+    if (!canvasRef.current || activeNodes.length === 0) return;
+    const width = canvasRef.current.width || 900;
+    const height = canvasRef.current.height || 600;
+    const total = activeNodes.length;
+
+    activeNodes.forEach((node, idx) => {
+      const ring = idx % 3;
+      const r = 200 + ring * 140;
+      const angle = (idx / total) * 2 * Math.PI + Math.random() * 0.3;
+      node.x = width / 2 + Math.cos(angle) * r;
+      node.y = height / 2 + Math.sin(angle) * r;
+      node.vx = 0;
+      node.vy = 0;
+    });
+    handleFitView();
+  };
+
+  // Zoom Helpers
+  const handleZoom = (delta) => {
+    if (!canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const width = canvas.width;
+    const height = canvas.height;
+    const centerScreen = { x: width / 2, y: height / 2 };
+
+    const oldK = transformRef.current.k;
+    const newK = Math.min(2.5, Math.max(0.35, oldK * (1 + delta)));
+
+    // Zoom centered on canvas viewport
+    const wx = (centerScreen.x - transformRef.current.x) / oldK;
+    const wy = (centerScreen.y - transformRef.current.y) / oldK;
+
+    transformRef.current.k = newK;
+    transformRef.current.x = centerScreen.x - wx * newK;
+    transformRef.current.y = centerScreen.y - wy * newK;
+    setZoomLevel(newK);
+  };
+
   // Simulation & Canvas Rendering Loop
   useEffect(() => {
     if (loading || activeNodes.length === 0 || !canvasRef.current) return;
@@ -212,6 +288,14 @@ export const Graph = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     let animationFrameId;
+
+    // Initial view alignment once canvas dimensions resolve
+    if (!isInitializedRef.current && canvas.clientWidth > 0) {
+      canvas.width = canvas.clientWidth;
+      canvas.height = canvas.clientHeight;
+      isInitializedRef.current = true;
+      handleFitView();
+    }
 
     const runSimulation = () => {
       const rect = canvas.getBoundingClientRect();
@@ -224,12 +308,14 @@ export const Graph = () => {
       const nodes = activeNodes;
       const edges = activeEdges;
 
-      // 1. Force Simulation Physics
-      const kRepel = 2400;
-      const kAttract = 0.045;
-      const gravity = 0.012;
-      const damping = 0.85;
+      // 1. Force Simulation Physics (Spacious, Anti-Colliding)
+      const kRepel = 28000;
+      const kAttract = 0.015;
+      const targetLinkDist = 200;
+      const gravity = 0.0006;
+      const damping = 0.82;
 
+      // Repulsion between all node pairs
       for (let i = 0; i < nodes.length; i++) {
         const nodeA = nodes[i];
         for (let j = i + 1; j < nodes.length; j++) {
@@ -239,7 +325,7 @@ export const Graph = () => {
           const distSq = dx * dx + dy * dy + 0.1;
           const dist = Math.sqrt(distSq);
           
-          if (dist < 320) {
+          if (dist < 600) {
             const force = kRepel / distSq;
             const fx = (dx / dist) * force;
             const fy = (dy / dist) * force;
@@ -253,9 +339,26 @@ export const Graph = () => {
               nodeB.vy += fy;
             }
           }
+
+          // HARD COLLISION BUFFER: Prevent overlapping badges & pills (minimum 135px spacing)
+          const minSeparation = 135;
+          if (dist < minSeparation) {
+            const overlap = (minSeparation - dist) * 0.45;
+            const nx = dx / (dist || 1);
+            const ny = dy / (dist || 1);
+            if (nodeA !== dragNodeRef.current) {
+              nodeA.x -= nx * overlap;
+              nodeA.y -= ny * overlap;
+            }
+            if (nodeB !== dragNodeRef.current) {
+              nodeB.x += nx * overlap;
+              nodeB.y += ny * overlap;
+            }
+          }
         }
       }
 
+      // Spring attraction between connected edges
       edges.forEach(edge => {
         const sourceNode = nodes.find(n => n.id === edge.source);
         const targetNode = nodes.find(n => n.id === edge.target);
@@ -265,7 +368,7 @@ export const Graph = () => {
           const dy = targetNode.y - sourceNode.y;
           const dist = Math.sqrt(dx * dx + dy * dy) + 0.1;
           
-          const force = kAttract * (dist - 90);
+          const force = kAttract * (dist - targetLinkDist);
           const fx = (dx / dist) * force;
           const fy = (dy / dist) * force;
           
@@ -280,7 +383,7 @@ export const Graph = () => {
         }
       });
 
-      // Position update & boundaries
+      // Position update & gentle centering
       nodes.forEach(node => {
         if (node === dragNodeRef.current) return;
         node.vx += (width / 2 - node.x) * gravity;
@@ -289,30 +392,38 @@ export const Graph = () => {
         node.y += node.vy;
         node.vx *= damping;
         node.vy *= damping;
-
-        node.x = Math.max(node.radius + 20, Math.min(width - node.radius - 20, node.x));
-        node.y = Math.max(node.radius + 20, Math.min(height - node.radius - 20, node.y));
       });
 
-      // 2. Draw Background Grid
+      // 2. Draw Canvas Background & Grid
       ctx.clearRect(0, 0, width, height);
+
+      // Grid in screen space with transform
+      const t = transformRef.current;
       ctx.save();
       ctx.strokeStyle = '#F1EFEA';
-      ctx.lineWidth = 0.5;
-      const gridSize = 28;
-      for (let x = 0; x < width; x += gridSize) {
+      ctx.lineWidth = 0.6;
+      const gridSize = 32 * t.k;
+      const startX = (t.x % gridSize);
+      const startY = (t.y % gridSize);
+
+      for (let x = startX; x < width; x += gridSize) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
         ctx.lineTo(x, height);
         ctx.stroke();
       }
-      for (let y = 0; y < height; y += gridSize) {
+      for (let y = startY; y < height; y += gridSize) {
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(width, y);
         ctx.stroke();
       }
       ctx.restore();
+
+      // Apply Zoom & Pan World Transformation
+      ctx.save();
+      ctx.translate(t.x, t.y);
+      ctx.scale(t.k, t.k);
 
       // 3. Draw Semantic Cluster Halos (Aura)
       const clusters = {};
@@ -329,7 +440,7 @@ export const Graph = () => {
           cx /= cNodes.length;
           cy /= cNodes.length;
 
-          let maxDist = 40;
+          let maxDist = 50;
           cNodes.forEach(n => {
             const d = Math.sqrt((n.x - cx) ** 2 + (n.y - cy) ** 2);
             if (d > maxDist) maxDist = d;
@@ -337,7 +448,7 @@ export const Graph = () => {
 
           // Soft Glowing Aura
           ctx.save();
-          const haloGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, maxDist + 45);
+          const haloGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, maxDist + 65);
           if (cName.includes('People') || cNodes[0].type === 'contact') {
             haloGrad.addColorStop(0, 'rgba(2, 132, 199, 0.08)');
             haloGrad.addColorStop(1, 'rgba(2, 132, 199, 0)');
@@ -350,7 +461,7 @@ export const Graph = () => {
           }
 
           ctx.beginPath();
-          ctx.arc(cx, cy, maxDist + 45, 0, 2 * Math.PI);
+          ctx.arc(cx, cy, maxDist + 65, 0, 2 * Math.PI);
           ctx.fillStyle = haloGrad;
           ctx.fill();
           ctx.restore();
@@ -373,17 +484,17 @@ export const Graph = () => {
 
           if (isPathEdge) {
             ctx.strokeStyle = '#F59E0B'; // Glowing Gold for Shortest Path
-            ctx.lineWidth = 3.5;
+            ctx.lineWidth = 3.5 / t.k;
             ctx.stroke();
           } else {
-            ctx.strokeStyle = pathSet ? 'rgba(209, 208, 202, 0.35)' : '#D1D0CA';
-            ctx.lineWidth = 1.2;
+            ctx.strokeStyle = pathSet ? 'rgba(209, 208, 202, 0.3)' : '#D6D3CD';
+            ctx.lineWidth = 1.4 / Math.sqrt(t.k);
             ctx.stroke();
           }
         }
       });
 
-      // 5. Draw Nodes
+      // 5. Draw Nodes & Labels
       nodes.forEach(node => {
         const isSel = selectedNodeRef.current && node.id === selectedNodeRef.current.id;
         const isHovered = hoveredNodeRef.current && node.id === hoveredNodeRef.current.id;
@@ -391,112 +502,157 @@ export const Graph = () => {
         const isDimmed = pathSet && !isPathNode;
 
         ctx.save();
-        if (isDimmed) ctx.globalAlpha = 0.25;
+        if (isDimmed) ctx.globalAlpha = 0.22;
 
-        // Path / Selection Halo
+        // Path / Selection Ring
         if (isPathNode || isSel || isHovered) {
           ctx.beginPath();
-          ctx.arc(node.x, node.y, node.radius + (isPathNode ? 10 : 7), 0, 2 * Math.PI);
-          ctx.strokeStyle = isPathNode ? 'rgba(245, 158, 11, 0.45)' : isSel ? 'rgba(109, 93, 252, 0.35)' : 'rgba(0,0,0,0.1)';
-          ctx.lineWidth = 3;
+          ctx.arc(node.x, node.y, node.radius + (isPathNode ? 10 : 8), 0, 2 * Math.PI);
+          ctx.strokeStyle = isPathNode 
+            ? 'rgba(245, 158, 11, 0.5)' 
+            : isSel 
+              ? 'rgba(109, 93, 252, 0.45)' 
+              : 'rgba(0,0,0,0.12)';
+          ctx.lineWidth = 3.5;
           ctx.stroke();
         }
 
-        // Color coding
+        // Distinct Colors
         let fillStyle = '#F5F3FF';
         let strokeStyle = '#6D5DFC';
+        let badgeBorder = '#DDD6FE';
         let emoji = '📝';
         
         if (node.type === 'contact') {
           fillStyle = '#F0F9FF';
           strokeStyle = '#0284C7';
+          badgeBorder = '#BAE6FD';
           emoji = '👤';
         } else if (node.type === 'task') {
           fillStyle = '#ECFDF5';
           strokeStyle = '#10B981';
+          badgeBorder = '#A7F3D0';
           emoji = '✅';
         }
 
-        // Node Background Circle
+        // Node Circle Body with soft shadow
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.06)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetY = 2;
         ctx.beginPath();
         ctx.arc(node.x, node.y, node.radius, 0, 2 * Math.PI);
         ctx.fillStyle = fillStyle;
         ctx.fill();
+        ctx.restore();
         
-        // Sketch border
+        // Node Ring Border
         ctx.strokeStyle = strokeStyle;
-        ctx.lineWidth = isPathNode ? 2.5 : 1.5;
+        ctx.lineWidth = isPathNode ? 2.5 : 2.0;
         ctx.stroke();
 
         // Node Icon/Emoji
-        ctx.font = '13px sans-serif';
+        ctx.font = '14px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(emoji, node.x, node.y + 0.5);
 
         // Node Label Pill
         const labelText = node.label || 'Untitled';
-        const displayLabel = labelText.length > 20 ? labelText.slice(0, 18) + '...' : labelText;
-        ctx.font = '500 11px Inter, sans-serif';
+        const displayLabel = labelText.length > 22 ? labelText.slice(0, 20) + '...' : labelText;
+        ctx.font = '600 11px Inter, -apple-system, BlinkMacSystemFont, sans-serif';
         const textWidth = ctx.measureText(displayLabel).width;
         
+        const pillW = textWidth + 16;
+        const pillH = 19;
+        const pillX = node.x - pillW / 2;
+        const pillY = node.y + node.radius + 5;
+
+        // Pill shadow & background
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.08)';
+        ctx.shadowBlur = 4;
+        ctx.shadowOffsetY = 1;
         ctx.fillStyle = '#FFFFFF';
-        ctx.strokeStyle = 'var(--border-color)';
+        ctx.strokeStyle = badgeBorder;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.roundRect(node.x - textWidth / 2 - 5, node.y + node.radius + 3, textWidth + 10, 16, 4);
+        ctx.roundRect(pillX, pillY, pillW, pillH, 5);
         ctx.fill();
         ctx.stroke();
+        ctx.restore();
 
+        // Pill text
         ctx.fillStyle = '#1C1917';
-        ctx.fillText(displayLabel, node.x, node.y + node.radius + 11);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(displayLabel, node.x, pillY + pillH / 2);
 
         ctx.restore();
       });
+
+      ctx.restore(); // Restore transform
 
       animationFrameId = requestAnimationFrame(runSimulation);
     };
 
     runSimulation();
     return () => cancelAnimationFrame(animationFrameId);
-  }, [loading, activeNodes, activeEdges, discoveredPath]);
+  }, [loading, activeNodes, activeEdges, discoveredPath, handleFitView]);
 
-  // Mouse drag & selection
-  const getNodeAtPos = (x, y) => {
+  // World coordinates converter
+  const screenToWorld = (screenX, screenY) => {
+    const t = transformRef.current;
+    return {
+      x: (screenX - t.x) / t.k,
+      y: (screenY - t.y) / t.k
+    };
+  };
+
+  // Find node at world coordinate pos
+  const getNodeAtPos = (worldX, worldY) => {
     for (let i = activeNodes.length - 1; i >= 0; i--) {
       const node = activeNodes[i];
-      const dx = x - node.x;
-      const dy = y - node.y;
-      if (dx * dx + dy * dy <= (node.radius + 8) * (node.radius + 8)) {
+      const dx = worldX - node.x;
+      const dy = worldY - node.y;
+      if (dx * dx + dy * dy <= (node.radius + 16) * (node.radius + 16)) {
         return node;
       }
     }
     return null;
   };
 
+  // Canvas Mouse Interactions
   const handleMouseDown = (e) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    const worldPos = screenToWorld(screenX, screenY);
 
-    const clicked = getNodeAtPos(x, y);
-    if (clicked) {
+    const clickedNode = getNodeAtPos(worldPos.x, worldPos.y);
+    if (clickedNode) {
       if (pathfindingMode) {
         if (!pathStart) {
-          setPathStart(clicked.id);
-        } else if (!pathTarget && clicked.id !== pathStart) {
-          setPathTarget(clicked.id);
+          setPathStart(clickedNode.id);
+        } else if (!pathTarget && clickedNode.id !== pathStart) {
+          setPathTarget(clickedNode.id);
         } else {
-          setPathStart(clicked.id);
+          setPathStart(clickedNode.id);
           setPathTarget(null);
         }
       }
-      setSelectedNode(clicked);
-      dragNodeRef.current = clicked;
-      offsetRef.current = { x: clicked.x - x, y: clicked.y - y };
+      setSelectedNode(clickedNode);
+      dragNodeRef.current = clickedNode;
+      nodeOffsetRef.current = { x: clickedNode.x - worldPos.x, y: clickedNode.y - worldPos.y };
     } else {
+      // Pan canvas background
+      isPanningRef.current = true;
+      panStartRef.current = {
+        x: screenX - transformRef.current.x,
+        y: screenY - transformRef.current.y
+      };
       if (!pathfindingMode) setSelectedNode(null);
     }
   };
@@ -505,21 +661,46 @@ export const Graph = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    const worldPos = screenToWorld(screenX, screenY);
 
-    hoveredNodeRef.current = getNodeAtPos(x, y);
+    hoveredNodeRef.current = getNodeAtPos(worldPos.x, worldPos.y);
 
     if (dragNodeRef.current) {
-      dragNodeRef.current.x = x + offsetRef.current.x;
-      dragNodeRef.current.y = y + offsetRef.current.y;
+      dragNodeRef.current.x = worldPos.x + nodeOffsetRef.current.x;
+      dragNodeRef.current.y = worldPos.y + nodeOffsetRef.current.y;
       dragNodeRef.current.vx = 0;
       dragNodeRef.current.vy = 0;
+    } else if (isPanningRef.current) {
+      transformRef.current.x = screenX - panStartRef.current.x;
+      transformRef.current.y = screenY - panStartRef.current.y;
     }
   };
 
   const handleMouseUp = () => {
     dragNodeRef.current = null;
+    isPanningRef.current = false;
+  };
+
+  // Mouse wheel zoom
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+
+    const zoomFactor = e.deltaY < 0 ? 1.12 : 0.88;
+    const oldK = transformRef.current.k;
+    const newK = Math.min(2.5, Math.max(0.35, oldK * zoomFactor));
+
+    const worldPos = screenToWorld(screenX, screenY);
+    transformRef.current.k = newK;
+    transformRef.current.x = screenX - worldPos.x * newK;
+    transformRef.current.y = screenY - worldPos.y * newK;
+    setZoomLevel(newK);
   };
 
   const getConnections = (nodeId = selectedNode?.id) => {
@@ -542,7 +723,7 @@ export const Graph = () => {
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '80vh', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: '82vh', fontFamily: 'var(--font-sans)', color: 'var(--text-primary)' }}>
       
       {/* 1. Header & Quick Controls */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '1rem' }}>
@@ -636,7 +817,7 @@ export const Graph = () => {
                 : !pathTarget 
                   ? `Origin: ${data.nodes.find(n => n.id === pathStart)?.label} ➔ Click Target Node 🎯`
                   : discoveredPath 
-                    ? `Path found in ${discoveredPath.length - 1} steps!` 
+                    ? `Path found in ${discoveredPath.length - 1} step(s)!` 
                     : 'No direct connection path found.'}
             </span>
           </div>
@@ -652,7 +833,7 @@ export const Graph = () => {
       )}
 
       {/* Main Canvas Area + Inspector Drawer */}
-      <div style={{ display: 'flex', flexGrow: 1, gap: '1.25rem', position: 'relative', minHeight: '520px' }}>
+      <div style={{ display: 'flex', flexGrow: 1, gap: '1.25rem', position: 'relative', minHeight: '560px' }}>
         
         {/* Canvas Frame */}
         <div style={{
@@ -666,17 +847,16 @@ export const Graph = () => {
         }}>
           <canvas
             ref={canvasRef}
-            width={850}
-            height={600}
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
+            onWheel={handleWheel}
             style={{
               display: 'block',
               width: '100%',
               height: '100%',
-              cursor: dragNodeRef.current ? 'grabbing' : 'grab'
+              cursor: isPanningRef.current ? 'grabbing' : dragNodeRef.current ? 'grabbing' : 'grab'
             }}
           />
 
@@ -690,7 +870,7 @@ export const Graph = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search nodes or clusters..."
                 style={{
-                  backgroundColor: 'rgba(255, 255, 255, 0.92)',
+                  backgroundColor: 'rgba(255, 255, 255, 0.94)',
                   backdropFilter: 'blur(4px)',
                   border: '1px solid var(--border-color)',
                   borderRadius: '100px',
@@ -711,6 +891,57 @@ export const Graph = () => {
               )}
             </div>
           </div>
+
+          {/* Pan & Zoom Navigation Floating Toolbar */}
+          <div style={{
+            position: 'absolute',
+            bottom: '1rem',
+            right: '1rem',
+            zIndex: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.35rem',
+            backgroundColor: 'rgba(255, 255, 255, 0.94)',
+            backdropFilter: 'blur(6px)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '100px',
+            padding: '0.3rem 0.5rem',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.06)'
+          }}>
+            <button
+              onClick={() => handleZoom(0.2)}
+              title="Zoom In"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', padding: '0.25rem', display: 'flex', alignItems: 'center' }}
+            >
+              <ZoomIn size={15} />
+            </button>
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, color: 'var(--text-secondary)', minWidth: '36px', textAlign: 'center' }}>
+              {Math.round(zoomLevel * 100)}%
+            </span>
+            <button
+              onClick={() => handleZoom(-0.2)}
+              title="Zoom Out"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', padding: '0.25rem', display: 'flex', alignItems: 'center' }}
+            >
+              <ZoomOut size={15} />
+            </button>
+            <div style={{ width: '1px', height: '14px', backgroundColor: 'var(--border-color)', margin: '0 2px' }} />
+            <button
+              onClick={handleFitView}
+              title="Fit to Screen"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', padding: '0.25rem', display: 'flex', alignItems: 'center' }}
+            >
+              <Maximize2 size={14} />
+            </button>
+            <button
+              onClick={handleRelayout}
+              title="Spread Layout"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-primary)', padding: '0.25rem', display: 'flex', alignItems: 'center' }}
+            >
+              <RefreshCw size={13} />
+            </button>
+          </div>
+
         </div>
 
         {/* Selected Node Glassmorphic Inspector Drawer */}
