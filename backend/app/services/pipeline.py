@@ -13,37 +13,51 @@ from backend.app.services.vector_db import vector_db
 from backend.app.kernels import get_kernel
 
 def update_contact_context(context: Optional[str], old_title: Optional[str], new_title: Optional[str], is_mentioned: bool) -> Optional[str]:
-    if not context:
-        if is_mentioned and new_title:
-            return f"Mentioned in note: '{new_title}'"
-        return context
-
-    lines = context.split('\n')
-    new_lines = []
-    for line in lines:
-        if old_title and f"'{old_title}'" in line:
-            continue
-        if new_title and f"'{new_title}'" in line:
-            continue
-        new_lines.append(line)
-
-    if is_mentioned and new_title:
-        new_lines.append(f"Also mentioned in: '{new_title}'")
-
-    # Clean up prefixes: the first line that starts with "Mentioned in note:" or "Also mentioned in:"
-    # should be "Mentioned in note: ...", and subsequent ones should be "Also mentioned in: ..."
-    first_mention_idx = -1
-    for i, line in enumerate(new_lines):
-        if line.startswith("Mentioned in note:") or line.startswith("Also mentioned in:"):
-            if first_mention_idx == -1:
-                first_mention_idx = i
-                title_part = line.split(":", 1)[1].strip()
-                new_lines[i] = f"Mentioned in note: {title_part}"
+    # Extract unique existing titles mentioned in context
+    existing_titles = []
+    other_lines = []
+    
+    if context:
+        for raw_line in context.split('\n'):
+            line = raw_line.strip()
+            if not line:
+                continue
+            if line.startswith("Mentioned in note:") or line.startswith("Also mentioned in:"):
+                # Extract title within quotes or after colon
+                part = line.split(":", 1)[1].strip()
+                # strip enclosing quotes
+                if (part.startswith("'") and part.endswith("'")) or (part.startswith('"') and part.endswith('"')):
+                    extracted_t = part[1:-1].strip()
+                else:
+                    extracted_t = part
+                if extracted_t and extracted_t not in existing_titles:
+                    existing_titles.append(extracted_t)
             else:
-                title_part = line.split(":", 1)[1].strip()
-                new_lines[i] = f"Also mentioned in: {title_part}"
+                other_lines.append(line)
 
-    return "\n".join(new_lines) if new_lines else None
+    # Clean out old_title if it was renamed
+    if old_title and old_title in existing_titles:
+        existing_titles.remove(old_title)
+
+    # If is_mentioned is False, ensure new_title is also removed
+    if not is_mentioned and new_title and new_title in existing_titles:
+        existing_titles.remove(new_title)
+
+    # If is_mentioned is True, ensure new_title is added once
+    if is_mentioned and new_title:
+        if new_title not in existing_titles:
+            existing_titles.append(new_title)
+
+    # Reconstruct clean, deduplicated lines
+    formatted_mention_lines = []
+    for i, t in enumerate(existing_titles):
+        if i == 0:
+            formatted_mention_lines.append(f"Mentioned in note: '{t}'")
+        else:
+            formatted_mention_lines.append(f"Also mentioned in: '{t}'")
+
+    all_lines = other_lines + formatted_mention_lines
+    return "\n".join(all_lines) if all_lines else None
 
 class IngestionPipelineService:
     async def process_note(self, db: Session, note_id: UUID, user_id: UUID, provider: Optional[str] = None) -> Note:

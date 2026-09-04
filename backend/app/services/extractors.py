@@ -22,39 +22,41 @@ class CognitiveExtractorService:
         time_str = current_time.strftime("%Y-%m-%dT%H:%M:%S")
         
         prompt_instructions = f"""
-        Analyze the following user note. You must extract and summarize the content.
+        Analyze the following user note or document. This may be a quick thought, a project note, or a full dump of Meeting Minutes / MoM (Minutes of Meeting, transcript, or sync notes).
         
         Reference Information:
         - Current local time is: {time_str} ({day_name}).
-        - Date resolution rules: You MUST resolve relative dates (like 'this Sunday', 'next Sunday', 'tomorrow', 'next week', 'Friday') into an absolute ISO datetime (YYYY-MM-DDTHH:MM:SS) calculated from today's reference date and day of week ({day_name}, {time_str}).
-          For example:
-          - If today is Wednesday ({time_str[:10]}) and the user mentions 'this Sunday' or 'next Sunday', calculate the exact upcoming Sunday date and set due_date to that date (default to 09:00:00 or mentioned time).
+        - Date resolution rules: You MUST resolve relative dates (like 'this Sunday', 'next Sunday', 'tomorrow', 'next week', 'Friday', 'by EOD', 'next month') into an absolute ISO datetime (YYYY-MM-DDTHH:MM:SS) calculated from today's reference date and day of week ({day_name}, {time_str}).
         - User's Occupation: {occupation} (Use this context to prioritize terms, categories, or action items relevant to their domain).
-        - AI Summary/Tone Style Preference: {ai_tone} (You MUST summarize the note using this tone/style. If tone is 'concise', write extremely short bullet-like summaries. If tone is 'creative', use engaging summaries with analogies. If tone is 'technical', emphasize specifications, data, and jargon. If tone is 'balanced', provide a normal objective, balanced summary).
+        - AI Summary/Tone Style Preference: {ai_tone}
         
-        Respond with a JSON object containing exactly the following keys:
-        1. "title": A short, friendly, descriptive title (maximum 6 words). If the note is empty or too short, make a default title.
-        2. "summary": A concise 1-2 sentence summary of the key content or actions.
-        3. "tags": An array of lowercase string keywords (concepts, projects, or categories). Max 5 tags.
-        4. "importance": An integer rating string from "1" to "10" reflecting the importance of this memory (e.g. "1" for trivial shopping list, "10" for a crucial business negotiation).
-        5. "memory_type": A classification string which MUST be exactly one of: "idea", "meeting", "decision", "expense", or "general".
-        6. "contacts": An array of names (first name, last name or full name) of people mentioned in the note text. Only extract actual names of people, not companies or products.
-        7. "tasks": An array of items, each with:
-           - "description": A clear action item (e.g., "Follow up with Vishal regarding AWS meetup").
-           - "due_date": An ISO datetime string (YYYY-MM-DDTHH:MM:SS) representing the task deadline or event date, resolved accurately using the reference current time and day of week. Always resolve relative calendar days like 'this Sunday', 'tomorrow', 'next Monday' to their specific date string. If no date or timeframe is mentioned at all, return null.
+        Entity & MoM Extraction Rules:
+        1. "title": A short, friendly, descriptive title (maximum 6 words, e.g. "Sprint Sync MoM", "Client Kickoff Meeting").
+        2. "summary": A concise 1-3 sentence summary capturing the primary objective, major decisions, and overall outcome of the note/meeting.
+        3. "tags": An array of lowercase keywords/topics (e.g. ["meeting", "sprint-planning", "marketing"]). Max 5 tags.
+        4. "importance": An integer rating string from "1" to "10" reflecting the priority and operational impact of this memory.
+        5. "memory_type": A classification string which MUST be exactly one of: "meeting", "idea", "decision", "expense", or "general". If the text contains meeting minutes, attendee lists, or discussion points, classify as "meeting".
+        6. "contacts": An array of ALL individual people/attendees mentioned, assigned tasks, or present in the note or MoM (first names, full names, or handles). Extract all stakeholders, speakers, and assignees (e.g. ["Rahul", "Priya Sharma", "David"]). Do not include company/product names.
+        7. "tasks": An array of ALL actionable items, next steps, commitments, or deliverables identified in the note/MoM:
+           - "description": Clear, self-contained action item stating who is doing what (e.g., "Priya to send updated API architecture document to team", "Fix CORS issue on staging").
+           - "due_date": An ISO datetime string (YYYY-MM-DDTHH:MM:SS) representing the deadline, resolved accurately. If no explicit date is mentioned, return null.
            
         Example Output Format:
         {{
-          "title": "Meeting with Rahul regarding proposal",
-          "summary": "Discussed project architecture with Rahul and planned the next steps for proposal submission.",
-          "tags": ["meeting", "proposal", "architecture"],
-          "importance": "8",
+          "title": "Q3 Roadmap Alignment MoM",
+          "summary": "Met with engineering and product leads to finalize Q3 deliverables. Agreed to prioritize database sharding and launch mobile app beta by next Friday.",
+          "tags": ["meeting", "roadmap", "engineering", "q3"],
+          "importance": "9",
           "memory_type": "meeting",
-          "contacts": ["Rahul"],
+          "contacts": ["Shabbir", "Vishal", "Jenny"],
           "tasks": [
             {{
-              "description": "Send proposal to Rahul",
-              "due_date": "2026-08-28T17:00:00"
+              "description": "Shabbir to benchmark PostgreSQL connection pooling",
+              "due_date": "{time_str[:10]}T17:00:00"
+            }},
+            {{
+              "description": "Vishal to share draft slide deck with stakeholders",
+              "due_date": null
             }}
           ]
         }}
