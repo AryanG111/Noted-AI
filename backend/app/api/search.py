@@ -21,9 +21,45 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
 from backend.app.services.agent_tools import get_agent_tools
 
+import re
+
 # In-memory briefing cache keyed by user_id: { user_id: { "data": response_dict, "timestamp": datetime_utc } }
 user_briefing_cache: Dict[str, Any] = {}
 BRIEFING_CACHE_TTL_SECONDS = 2 * 3600  # 2 hours
+
+def sanitize_agent_output(text: str) -> str:
+    if not text:
+        return ""
+    # 1. Remove closed <thought>...</thought> and <think>...</think> blocks
+    cleaned = re.sub(r'<thought>.*?</thought>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    cleaned = re.sub(r'<think>.*?</think>', '', cleaned, flags=re.DOTALL | re.IGNORECASE)
+    
+    if not cleaned.strip():
+        # 2. If text was entirely inside an unclosed tag, strip the tags themselves
+        cleaned = re.sub(r'</?(?:thought|think)>', '', text, flags=re.IGNORECASE)
+        lines = cleaned.strip().split('\n')
+        valid_lines = []
+        started = False
+        for line in lines:
+            l_str = line.strip()
+            if not started:
+                if l_str.startswith(('*', '-', '#', '>')) or any(l_str.lower().startswith(p) for p in ['hello', 'hi', 'here', 'i can', 'i am', 'welcome', 'as noted', 'noted ai', 'sure', 'certainly']):
+                    started = True
+                    valid_lines.append(line)
+                continue
+            valid_lines.append(line)
+        cleaned = '\n'.join(valid_lines) if valid_lines else cleaned
+        
+    # 3. Strip all internal IDs and raw UUIDs from the output
+    cleaned = re.sub(r'\(?internal_[a-z_]*id:\s*[0-9a-fA-F-]+\)?', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b', '', cleaned)
+    # Clean any bold empty markers like ** ** or empty brackets
+    cleaned = re.sub(r'\*\*\s*\*\*', '', cleaned)
+    cleaned = re.sub(r'\(\s*\)', '', cleaned)
+    cleaned = re.sub(r'\|\s*Task ID\s*\|', '|', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\|\s*ID\s*\|', '|', cleaned, flags=re.IGNORECASE)
+    
+    return cleaned.strip()
 
 router = APIRouter(prefix="/search", tags=["search"])
 
@@ -145,42 +181,6 @@ async def ask_noted(
             "citations": []
         }
         
-import re
-
-def sanitize_agent_output(text: str) -> str:
-    if not text:
-        return ""
-    # 1. Remove closed <thought>...</thought> and <think>...</think> blocks
-    cleaned = re.sub(r'<thought>.*?</thought>', '', text, flags=re.DOTALL | re.IGNORECASE)
-    cleaned = re.sub(r'<think>.*?</think>', '', cleaned, flags=re.DOTALL | re.IGNORECASE)
-    
-    if not cleaned.strip():
-        # 2. If text was entirely inside an unclosed tag, strip the tags themselves
-        cleaned = re.sub(r'</?(?:thought|think)>', '', text, flags=re.IGNORECASE)
-        lines = cleaned.strip().split('\n')
-        valid_lines = []
-        started = False
-        for line in lines:
-            l_str = line.strip()
-            if not started:
-                if l_str.startswith(('*', '-', '#', '>')) or any(l_str.lower().startswith(p) for p in ['hello', 'hi', 'here', 'i can', 'i am', 'welcome', 'as noted', 'noted ai', 'sure', 'certainly']):
-                    started = True
-                    valid_lines.append(line)
-                continue
-            valid_lines.append(line)
-        cleaned = '\n'.join(valid_lines) if valid_lines else cleaned
-        
-    # 3. Strip all internal IDs and raw UUIDs from the output
-    cleaned = re.sub(r'\(?internal_[a-z_]*id:\s*[0-9a-fA-F-]+\)?', '', cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b', '', cleaned)
-    # Clean any bold empty markers like ** ** or empty brackets
-    cleaned = re.sub(r'\*\*\s*\*\*', '', cleaned)
-    cleaned = re.sub(r'\(\s*\)', '', cleaned)
-    cleaned = re.sub(r'\|\s*Task ID\s*\|', '|', cleaned, flags=re.IGNORECASE)
-    cleaned = re.sub(r'\|\s*ID\s*\|', '|', cleaned, flags=re.IGNORECASE)
-    
-    return cleaned.strip()
-
     # 3. Create prompt template
     prompt = ChatPromptTemplate.from_messages([
         ("system", (
