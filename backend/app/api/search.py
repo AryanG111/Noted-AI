@@ -16,8 +16,8 @@ from backend.app.kernels import get_kernel
 from backend.app.core.config import settings
 
 # Langchain imports
-from langchain_classic.agents import AgentExecutor, create_react_agent
-from langchain_core.prompts import PromptTemplate
+from langchain_classic.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
 from backend.app.services.agent_tools import get_agent_tools
 
@@ -146,35 +146,21 @@ async def ask_noted(
         }
         
     # 3. Create prompt template
-    template = """You are Noted AI, the private, warm, intelligent cognitive assistant for the user.
-Answer the user's question as best you can. You have access to the following tools:
-
-{tools}
-
-Use the following format:
-
-Question: the input question you must answer
-Thought: you should always think about what to do. Always execute thoughts and actions step-by-step.
-Action: the action to take, should be one of [{tool_names}]
-Action Input: the input to the action
-Observation: the result of the action
-... (this Thought/Action/Action Input/Observation can repeat N times)
-Thought: I now know the final answer
-Final Answer: the final answer to the original input question. Write your final answer in a {ai_tone} style.
-
-Begin!
-
-User's Background: {user_background}
-Current local time is: {current_time} (Use this to resolve relative dates like 'tomorrow', 'next week', 'Friday').
-
-Question: {input}
-Thought:{agent_scratchpad}"""
-
-    prompt = PromptTemplate.from_template(template)
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", (
+            "You are Noted AI, the private, warm, intelligent cognitive assistant for the user.\n"
+            "User's Background: {user_background}\n"
+            "Preferred Style / Tone: {ai_tone}\n"
+            "Current local time is: {current_time} (Use this to resolve relative dates like 'tomorrow', 'next week', 'Friday').\n"
+            "Answer the user's questions clearly, accurately, and helpfully using the available tools when needed."
+        )),
+        ("human", "{input}"),
+        MessagesPlaceholder("agent_scratchpad"),
+    ])
     
     # 4. Construct Agent & Executor
     try:
-        agent = create_react_agent(llm, tools, prompt)
+        agent = create_tool_calling_agent(llm, tools, prompt)
         agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True)
         
         # 5. Run async
