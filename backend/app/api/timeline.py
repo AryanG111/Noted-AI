@@ -50,12 +50,14 @@ def get_timeline(
     contacts = db.query(Contact).filter(Contact.user_id == current_user.id).all()
     for contact in contacts:
         timestamp = contact.last_interaction or contact.created_at
+        entity_type = getattr(contact, "entity_type", "person") or "person"
         events.append({
             "id": str(contact.id),
             "type": "contact",
+            "entity_type": entity_type,
             "timestamp": timestamp.isoformat() if timestamp else None,
-            "title": f"Met / Mentioned {contact.name}",
-            "description": f"Evolving Memory Profile: {contact.role or 'Contact'}. Context: {contact.context or 'No contextual logs yet'}"
+            "title": f"Interacted with {contact.name}" if entity_type == "team" else f"Met / Mentioned {contact.name}",
+            "description": f"Evolving {entity_type.capitalize()} Profile: {contact.role or ('Team' if entity_type == 'team' else 'Contact')}. Context: {contact.context or 'No contextual logs yet'}"
         })
         
     # Sort events by timestamp descending. Events without timestamps are placed at the end.
@@ -91,16 +93,20 @@ def get_memory_graph(
             "tags": tag_list
         })
         
-    # 2. Gather Contacts
+    # 2. Gather Contacts (People, Teams, Organizations, Institutions)
     contacts = db.query(Contact).filter(Contact.user_id == current_user.id).all()
     for contact in contacts:
+        entity_type = getattr(contact, "entity_type", "person") or "person"
+        cluster = "Teams & Organizations" if entity_type in ["team", "organization", "institution"] else "People & Network"
         nodes.append({
             "id": str(contact.id),
             "label": contact.name,
             "type": "contact",
-            "cluster": "People & Network",
+            "entity_type": entity_type,
+            "organization": getattr(contact, "organization", None),
+            "cluster": cluster,
             "created_at": (contact.last_interaction or contact.created_at).isoformat() if (contact.last_interaction or contact.created_at) else None,
-            "role": contact.role or "Contact",
+            "role": contact.role or ("Team" if entity_type == "team" else "Contact"),
             "context": contact.context or "No contextual notes yet"
         })
         

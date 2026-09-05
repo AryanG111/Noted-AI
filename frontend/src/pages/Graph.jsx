@@ -121,15 +121,19 @@ export const Graph = () => {
         return false;
       }
       // 2. Type filter
-      if (typeFilter !== 'all' && node.type !== typeFilter) {
-        return false;
-      }
+      if (typeFilter === 'note' && node.type !== 'note') return false;
+      if (typeFilter === 'task' && node.type !== 'task') return false;
+      if (typeFilter === 'person' && (node.type !== 'contact' || (node.entity_type && node.entity_type !== 'person'))) return false;
+      if (typeFilter === 'team_org' && (node.type !== 'contact' || (!node.entity_type || node.entity_type === 'person'))) return false;
+      
       // 3. Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchLabel = node.label?.toLowerCase().includes(q);
         const matchCluster = node.cluster?.toLowerCase().includes(q);
-        if (!matchLabel && !matchCluster) return false;
+        const matchRole = node.role?.toLowerCase().includes(q);
+        const matchOrg = node.organization?.toLowerCase().includes(q);
+        if (!matchLabel && !matchCluster && !matchRole && !matchOrg) return false;
       }
       return true;
     });
@@ -448,7 +452,10 @@ export const Graph = () => {
           // Soft Glowing Cluster Aura
           ctx.save();
           const haloGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, maxDist + 55);
-          if (cName.includes('People') || cNodes[0].type === 'contact') {
+          if (cName.includes('Teams') || cName.includes('Organization')) {
+            haloGrad.addColorStop(0, 'rgba(147, 51, 234, 0.10)');
+            haloGrad.addColorStop(1, 'rgba(147, 51, 234, 0)');
+          } else if (cName.includes('People') || cNodes[0].type === 'contact') {
             haloGrad.addColorStop(0, 'rgba(2, 132, 199, 0.09)');
             haloGrad.addColorStop(1, 'rgba(2, 132, 199, 0)');
           } else if (cName.includes('Action') || cNodes[0].type === 'task') {
@@ -516,17 +523,34 @@ export const Graph = () => {
           ctx.stroke();
         }
 
-        // Distinct Type Theme
+        // Distinct Type & Entity Theme
         let fillStyle = '#F5F3FF';
         let strokeStyle = '#6D5DFC';
         let badgeBorder = '#DDD6FE';
         let emoji = '📝';
         
         if (node.type === 'contact') {
-          fillStyle = '#F0F9FF';
-          strokeStyle = '#0284C7';
-          badgeBorder = '#BAE6FD';
-          emoji = '👤';
+          if (node.entity_type === 'team') {
+            fillStyle = '#F3E8FF';
+            strokeStyle = '#9333EA';
+            badgeBorder = '#DDD6FE';
+            emoji = '👥';
+          } else if (node.entity_type === 'organization') {
+            fillStyle = '#FEF3C7';
+            strokeStyle = '#D97706';
+            badgeBorder = '#FDE68A';
+            emoji = '🏢';
+          } else if (node.entity_type === 'institution') {
+            fillStyle = '#DCFCE7';
+            strokeStyle = '#16A34A';
+            badgeBorder = '#A7F3D0';
+            emoji = '🎓';
+          } else {
+            fillStyle = '#F0F9FF';
+            strokeStyle = '#0284C7';
+            badgeBorder = '#BAE6FD';
+            emoji = '👤';
+          }
         } else if (node.type === 'task') {
           fillStyle = '#ECFDF5';
           strokeStyle = '#10B981';
@@ -750,24 +774,29 @@ export const Graph = () => {
         {/* Filter Pills & Pathfinding Action Button */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', backgroundColor: 'var(--warm-bg)', padding: '0.2rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)' }}>
-            {['all', 'note', 'contact', 'task'].map(type => (
+            {[
+              { id: 'all', label: 'All' },
+              { id: 'note', label: 'Notes 📝' },
+              { id: 'person', label: 'People 👤' },
+              { id: 'team_org', label: 'Teams & Orgs 👥' },
+              { id: 'task', label: 'Tasks ✅' }
+            ].map(tab => (
               <button
-                key={type}
-                onClick={() => setTypeFilter(type)}
+                key={tab.id}
+                onClick={() => setTypeFilter(tab.id)}
                 style={{
-                  background: typeFilter === type ? '#FFFFFF' : 'none',
-                  color: typeFilter === type ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  background: typeFilter === tab.id ? '#FFFFFF' : 'none',
+                  color: typeFilter === tab.id ? 'var(--text-primary)' : 'var(--text-secondary)',
                   border: 'none',
                   borderRadius: 'var(--radius-sm)',
                   padding: '0.25rem 0.65rem',
                   fontSize: '0.75rem',
-                  fontWeight: typeFilter === type ? 600 : 500,
+                  fontWeight: typeFilter === tab.id ? 600 : 500,
                   cursor: 'pointer',
-                  boxShadow: typeFilter === type ? '0 1px 2px rgba(0,0,0,0.05)' : 'none',
-                  textTransform: 'capitalize'
+                  boxShadow: typeFilter === tab.id ? '0 1px 2px rgba(0,0,0,0.05)' : 'none'
                 }}
               >
-                {type === 'all' ? 'All' : type === 'note' ? 'Notes 📝' : type === 'contact' ? 'People 👤' : 'Tasks ✅'}
+                {tab.label}
               </button>
             ))}
           </div>
@@ -949,127 +978,174 @@ export const Graph = () => {
         </div>
 
         {/* Selected Node Glassmorphic Inspector Drawer */}
-        {selectedNode && (
-          <div style={{
-            width: '320px',
-            backgroundColor: '#FFFFFF',
-            border: '1px solid var(--border-color)',
-            borderRadius: 'var(--radius-lg)',
-            padding: '1.25rem',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem',
-            flexShrink: 0,
-            overflowY: 'auto',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.06)'
-          }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <span style={{ 
-                  fontSize: '0.68rem', 
-                  fontWeight: 600, 
-                  letterSpacing: '0.06em', 
-                  color: selectedNode.type === 'note' ? 'var(--purple-accent)' : selectedNode.type === 'contact' ? '#0284C7' : '#10B981',
-                  textTransform: 'uppercase'
-                }}>
-                  {selectedNode.type} • {selectedNode.cluster || 'Entity'}
-                </span>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', margin: '0.2rem 0 0 0' }}>
-                  {selectedNode.label}
-                </h3>
-              </div>
-              <button
-                onClick={() => setSelectedNode(null)}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '0.2rem' }}
-              >
-                <X size={15} />
-              </button>
-            </div>
+        {selectedNode && (() => {
+          const getInspectorEntityInfo = (node) => {
+            if (node.type === 'note') {
+              return { label: 'NOTE', color: 'var(--purple-accent)', bg: '#F5F3FF' };
+            }
+            if (node.type === 'task') {
+              return { label: 'TASK', color: '#10B981', bg: '#ECFDF5' };
+            }
+            if (node.entity_type === 'team') {
+              return { label: 'TEAM / DEPARTMENT', color: '#9333EA', bg: '#F3E8FF' };
+            }
+            if (node.entity_type === 'organization') {
+              return { label: 'ORGANIZATION / COMPANY', color: '#D97706', bg: '#FEF3C7' };
+            }
+            if (node.entity_type === 'institution') {
+              return { label: 'INSTITUTION / SCHOOL', color: '#16A34A', bg: '#DCFCE7' };
+            }
+            return { label: 'PERSON', color: '#0284C7', bg: '#F0F9FF' };
+          };
 
+          const entityInfo = getInspectorEntityInfo(selectedNode);
+
+          return (
             <div style={{
-              fontSize: '0.82rem',
-              color: 'var(--text-secondary)',
-              lineHeight: '1.45',
-              backgroundColor: 'var(--warm-bg)',
-              padding: '0.75rem',
-              borderRadius: 'var(--radius-sm)',
-              border: '1px solid var(--border-color)'
+              width: '320px',
+              backgroundColor: '#FFFFFF',
+              border: '1px solid var(--border-color)',
+              borderRadius: 'var(--radius-lg)',
+              padding: '1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+              flexShrink: 0,
+              overflowY: 'auto',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.06)'
             }}>
-              {selectedNode.summary || selectedNode.context || selectedNode.description || 'No detailed preview available.'}
-            </div>
-
-            <button
-              onClick={() => {
-                if (selectedNode.type === 'note') {
-                  navigate('/notes', { state: { selectedNoteId: selectedNode.id } });
-                } else if (selectedNode.type === 'contact') {
-                  navigate('/contacts');
-                } else {
-                  navigate('/tasks');
-                }
-              }}
-              className="btn btn-primary"
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.4rem',
-                padding: '0.45rem',
-                fontSize: '0.8rem',
-                fontWeight: 600
-              }}
-            >
-              Open in {selectedNode.type === 'note' ? 'Notes Editor' : selectedNode.type === 'contact' ? 'Contacts' : 'Tasks'} <ExternalLink size={13} />
-            </button>
-
-            <div>
-              <span style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
-                Direct Connections ({getConnections().length})
-              </span>
-              {getConnections().length === 0 ? (
-                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-                  No connections detected.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
-                  {getConnections().map(conn => (
-                    <div
-                      key={conn.id}
-                      onClick={() => setSelectedNode(conn)}
-                      style={{
-                        padding: '0.45rem 0.65rem',
-                        borderRadius: 'var(--radius-sm)',
-                        backgroundColor: 'var(--warm-bg)',
-                        border: '1px solid var(--border-color)',
-                        fontSize: '0.78rem',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        transition: 'var(--transition)'
-                      }}
-                      className="note-mention-card"
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', overflow: 'hidden' }}>
-                        <span style={{
-                          width: '6px',
-                          height: '6px',
-                          borderRadius: '50%',
-                          backgroundColor: conn.type === 'note' ? 'var(--purple-accent)' : conn.type === 'contact' ? '#0284C7' : '#10B981',
-                          flexShrink: 0
-                        }} />
-                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {conn.label}
-                        </span>
-                      </div>
-                      <ArrowRight size={11} style={{ color: 'var(--text-secondary)' }} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <span style={{ 
+                    fontSize: '0.68rem', 
+                    fontWeight: 700, 
+                    letterSpacing: '0.06em', 
+                    color: entityInfo.color,
+                    backgroundColor: entityInfo.bg,
+                    padding: '0.15rem 0.45rem',
+                    borderRadius: '4px',
+                    display: 'inline-block',
+                    marginBottom: '0.3rem',
+                    textTransform: 'uppercase'
+                  }}>
+                    {entityInfo.label}
+                  </span>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                    {selectedNode.label}
+                  </h3>
+                  {selectedNode.role && (
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                      {selectedNode.role}
+                      {selectedNode.organization ? ` • ${selectedNode.organization}` : ''}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
+                <button
+                  onClick={() => setSelectedNode(null)}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', padding: '0.2rem' }}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              <div style={{
+                fontSize: '0.82rem',
+                color: 'var(--text-secondary)',
+                lineHeight: '1.45',
+                backgroundColor: 'var(--warm-bg)',
+                padding: '0.75rem',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid var(--border-color)'
+              }}>
+                {selectedNode.summary || selectedNode.context || selectedNode.description || 'No detailed preview available.'}
+              </div>
+
+              <button
+                onClick={() => {
+                  if (selectedNode.type === 'note') {
+                    navigate('/notes', { state: { selectedNoteId: selectedNode.id } });
+                  } else if (selectedNode.type === 'contact') {
+                    navigate('/contacts');
+                  } else {
+                    navigate('/tasks');
+                  }
+                }}
+                className="btn btn-primary"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.4rem',
+                  padding: '0.45rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 600
+                }}
+              >
+                Open in {selectedNode.type === 'note' ? 'Notes Editor' : selectedNode.type === 'contact' ? 'Contacts & Profiles' : 'Tasks'} <ExternalLink size={13} />
+              </button>
+
+              <div>
+                <span style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-secondary)', display: 'block', marginBottom: '0.5rem' }}>
+                  Direct Connections ({getConnections().length})
+                </span>
+                {getConnections().length === 0 ? (
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
+                    No connections detected.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', maxHeight: '180px', overflowY: 'auto' }}>
+                    {getConnections().map(conn => {
+                      const connColor = conn.type === 'note' 
+                        ? 'var(--purple-accent)' 
+                        : conn.entity_type === 'team' 
+                          ? '#9333EA' 
+                          : conn.entity_type === 'organization' 
+                            ? '#D97706' 
+                            : conn.entity_type === 'institution' 
+                              ? '#16A34A' 
+                              : conn.type === 'contact' 
+                                ? '#0284C7' 
+                                : '#10B981';
+                      return (
+                        <div
+                          key={conn.id}
+                          onClick={() => setSelectedNode(conn)}
+                          style={{
+                            padding: '0.45rem 0.65rem',
+                            borderRadius: 'var(--radius-sm)',
+                            backgroundColor: 'var(--warm-bg)',
+                            border: '1px solid var(--border-color)',
+                            fontSize: '0.78rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            transition: 'var(--transition)'
+                          }}
+                          className="note-mention-card"
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', overflow: 'hidden' }}>
+                            <span style={{
+                              width: '7px',
+                              height: '7px',
+                              borderRadius: '50%',
+                              backgroundColor: connColor,
+                              flexShrink: 0
+                            }} />
+                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {conn.label}
+                            </span>
+                          </div>
+                          <ArrowRight size={11} style={{ color: 'var(--text-secondary)' }} />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
 
       {/* 3. Bottom Time-Travel Evolution Scrubber Bar */}
