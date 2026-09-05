@@ -145,6 +145,39 @@ async def ask_noted(
             "citations": []
         }
         
+import re
+
+def sanitize_agent_output(text: str) -> str:
+    if not text:
+        return ""
+    # 1. Remove closed <thought>...</thought> and <think>...</think> blocks
+    cleaned = re.sub(r'<thought>.*?</thought>', '', text, flags=re.DOTALL | re.IGNORECASE)
+    cleaned = re.sub(r'<think>.*?</think>', '', cleaned, flags=re.DOTALL | re.IGNORECASE)
+    
+    if cleaned.strip():
+        return cleaned.strip()
+        
+    # 2. If text was entirely inside an unclosed tag, strip the tags themselves
+    cleaned = re.sub(r'</?(?:thought|think)>', '', text, flags=re.IGNORECASE)
+    
+    # Filter out initial meta-planning lines if any
+    lines = cleaned.strip().split('\n')
+    valid_lines = []
+    started = False
+    for line in lines:
+        l_str = line.strip()
+        if not started:
+            if l_str.startswith(('*', '-', '#', '>')) or any(l_str.lower().startswith(p) for p in ['hello', 'hi', 'here', 'i can', 'i am', 'welcome', 'as noted', 'noted ai', 'sure', 'certainly']):
+                started = True
+                valid_lines.append(line)
+            continue
+        valid_lines.append(line)
+        
+    if valid_lines:
+        return '\n'.join(valid_lines).strip()
+        
+    return cleaned.strip()
+
     # 3. Create prompt template
     prompt = ChatPromptTemplate.from_messages([
         ("system", (
@@ -155,6 +188,7 @@ async def ask_noted(
             "Formatting & Tone Guidelines:\n"
             "- Communicate with high editorial clarity, warmth, and intelligence.\n"
             "- When listing tasks, commitments, notes, or contacts, use clean bullet points with bold highlights and due dates.\n"
+            "- NEVER output internal thought traces, draft planning notes, reasoning scratchpads, or <thought> / <think> tags. Output only the final user-facing response directly.\n"
             "- NEVER expose raw internal database UUIDs to the user in conversational answers.\n"
             "- Keep tables clean and standard, or use readable bullet lists for lists of items."
         )),
@@ -174,7 +208,7 @@ async def ask_noted(
             "ai_tone": current_user.ai_tone or "balanced",
             "current_time": datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
         })
-        response_text = response.get("output", "Agent did not yield an output.")
+        response_text = sanitize_agent_output(response.get("output", "Agent did not yield an output."))
     except Exception as e:
         print(f"Agent Execution error: {e}")
         response_text = f"An error occurred in the agent reasoning loop: {e}"

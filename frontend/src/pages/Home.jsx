@@ -268,8 +268,27 @@ export const Home = () => {
         body: JSON.stringify({ query: chatQuery.trim() })
       });
       
-      const data = await handleApiResponse(response, 'Unable to process search query.');
-      setChatResponse(data.answer);
+      const rawAnswer = data.answer || '';
+      let cleanAnswer = rawAnswer.replace(/<thought>[\s\S]*?<\/thought>/gi, '').replace(/<think>[\s\S]*?<\/think>/gi, '');
+      if (!cleanAnswer.trim()) {
+        cleanAnswer = rawAnswer.replace(/<\/?(?:thought|think)>/gi, '');
+        const lines = cleanAnswer.trim().split('\n');
+        const valid = [];
+        let started = false;
+        for (const line of lines) {
+          const l = line.trim();
+          if (!started) {
+            if (l.startsWith('*') || l.startsWith('-') || l.startsWith('#') || l.startsWith('>') || /^(hello|hi|here|i can|i am|welcome|as noted|noted ai|sure|certainly)/i.test(l)) {
+              started = true;
+              valid.push(line);
+            }
+            continue;
+          }
+          valid.push(line);
+        }
+        cleanAnswer = (valid.length > 0 ? valid.join('\n') : cleanAnswer).trim();
+      }
+      setChatResponse(cleanAnswer.trim());
       setCitations(data.citations || []);
     } catch (err) {
       console.error(err);
