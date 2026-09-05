@@ -11,7 +11,9 @@ class Contact(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     name = Column(String, nullable=False)
     role = Column(String, nullable=True)
-    context = Column(String, nullable=True)  # Aggregated text description/memory profile of the person
+    entity_type = Column(String, default="person", nullable=True)  # person, team, organization, institution
+    organization = Column(String, nullable=True)  # Parent company, institution, or school
+    context = Column(String, nullable=True)  # Aggregated text description/memory profile of the person/team
     last_interaction = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now(), server_default=func.now())

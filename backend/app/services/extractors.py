@@ -36,9 +36,9 @@ class CognitiveExtractorService:
         3. "tags": An array of lowercase keywords/topics (e.g. ["meeting", "sprint-planning", "marketing"]). Max 5 tags.
         4. "importance": An integer rating string from "1" to "10" reflecting the priority and operational impact of this memory.
         5. "memory_type": A classification string which MUST be exactly one of: "meeting", "idea", "decision", "expense", or "general". If the text contains meeting minutes, attendee lists, or discussion points, classify as "meeting".
-        6. "contacts": An array of ALL individual people/attendees mentioned, assigned tasks, or present in the note or MoM (first names, full names, or handles). Extract all stakeholders, speakers, and assignees (e.g. ["Rahul", "Priya Sharma", "David"]). Do not include company/product names.
+        6. "contacts": An array of ALL individual people, attendees, teams, departments, groups, and organizations/institutions mentioned or assigned tasks in the note/MoM (e.g. ["Rahul", "Priya Sharma", "Ops Team", "Frontend Team", "Stanford University", "Acme Corp"]). Do not ignore or drop teams or organizational units.
         7. "tasks": An array of ALL actionable items, next steps, commitments, or deliverables identified in the note/MoM:
-           - "description": Clear, self-contained action item stating who is doing what (e.g., "Priya to send updated API architecture document to team", "Fix CORS issue on staging").
+           - "description": Clear, self-contained action item stating who is doing what (e.g., "Priya to send updated API architecture document to team", "Ops Team to provision staging environment", "Fix CORS issue on staging").
            - "due_date": An ISO datetime string (YYYY-MM-DDTHH:MM:SS) representing the deadline, resolved accurately. If no explicit date is mentioned, return null.
            
         Example Output Format:
@@ -48,7 +48,7 @@ class CognitiveExtractorService:
           "tags": ["meeting", "roadmap", "engineering", "q3"],
           "importance": "9",
           "memory_type": "meeting",
-          "contacts": ["Shabbir", "Vishal", "Jenny"],
+          "contacts": ["Shabbir", "Vishal", "Ops Team", "Jenny"],
           "tasks": [
             {{
               "description": "Shabbir to benchmark PostgreSQL connection pooling",

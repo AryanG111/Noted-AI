@@ -20,7 +20,9 @@ import {
   Calendar,
   CheckCircle2,
   MessageSquare,
-  ExternalLink
+  ExternalLink,
+  AlertTriangle,
+  Clock
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import LottieAnimation from '../components/LottieAnimation';
@@ -50,6 +52,7 @@ export const Home = () => {
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [recentTasks, setRecentTasks] = useState([]);
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
+  const [overdueTasksCount, setOverdueTasksCount] = useState(0);
   const [notesCount, setNotesCount] = useState(0);
   const [recentNotes, setRecentNotes] = useState([]);
   const [allContacts, setAllContacts] = useState([]);
@@ -123,7 +126,10 @@ export const Home = () => {
       if (tasksRes.status === 'fulfilled' && tasksRes.value.ok) {
         const data = await tasksRes.value.json();
         const pending = data.filter(t => t.status !== 'done');
+        const now = new Date();
+        const overdue = pending.filter(t => t.due_date && new Date(t.due_date) < now);
         setPendingTasksCount(pending.length);
+        setOverdueTasksCount(overdue.length);
         setRecentTasks(pending.slice(0, 3));
       }
 
@@ -338,7 +344,7 @@ export const Home = () => {
       )}
 
       {/* 1. Header (Clean Editorial Greeting + New Note Action) */}
-      <div style={{ marginBottom: '2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
+      <div style={{ marginBottom: '1.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '1rem' }}>
         <div>
           <div style={{ 
             fontSize: '0.7rem', 
@@ -370,6 +376,55 @@ export const Home = () => {
           <Plus size={15} /> New Note
         </button>
       </div>
+
+      {/* High-Priority Overdue Backlog Alert Banner */}
+      {overdueTasksCount > 0 && (
+        <div 
+          onClick={() => navigate('/tasks')}
+          style={{
+            backgroundColor: '#FEF2F2',
+            border: '1.5px solid #FCA5A5',
+            borderRadius: 'var(--radius-md)',
+            padding: '0.85rem 1.25rem',
+            marginBottom: '1.75rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+            transition: 'var(--transition)',
+            boxShadow: '0 2px 4px rgba(220, 38, 38, 0.06)'
+          }}
+          className="note-mention-card"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              backgroundColor: '#FEE2E2',
+              color: '#DC2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}>
+              <AlertTriangle size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#991B1B' }}>
+                🚨 High-Priority: {overdueTasksCount} {overdueTasksCount === 1 ? 'task is' : 'tasks are'} past due date!
+              </div>
+              <div style={{ fontSize: '0.78rem', color: '#B91C1C', marginTop: '0.1rem' }}>
+                Your overdue backlog items require immediate attention. Click to resolve.
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: '#DC2626', fontWeight: 600, fontSize: '0.8rem' }}>
+            <span>Review Backlog</span>
+            <ArrowRight size={14} />
+          </div>
+        </div>
+      )}
 
       {/* 2. Clean, Minimal KPI Cards (Monochrome / Neutral Aesthetic) */}
       <div style={{
@@ -415,7 +470,7 @@ export const Home = () => {
           onClick={() => navigate('/tasks')}
           style={{
             backgroundColor: '#FFFFFF',
-            border: '1px solid var(--border-color)',
+            border: overdueTasksCount > 0 ? '1.5px solid #FCA5A5' : '1px solid var(--border-color)',
             borderRadius: 'var(--radius-md)',
             padding: '1rem 1.25rem',
             cursor: 'pointer',
@@ -425,7 +480,7 @@ export const Home = () => {
         >
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', color: 'var(--text-secondary)', marginBottom: '0.35rem' }}>
             <span style={{ fontSize: '0.72rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Tasks</span>
-            <CheckSquare size={15} style={{ color: 'var(--text-secondary)' }} />
+            <CheckSquare size={15} style={{ color: overdueTasksCount > 0 ? '#DC2626' : 'var(--text-secondary)' }} />
           </div>
           {dashboardLoading ? (
             <div>
@@ -434,8 +489,22 @@ export const Home = () => {
             </div>
           ) : (
             <>
-              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {pendingTasksCount}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  {pendingTasksCount}
+                </div>
+                {overdueTasksCount > 0 && (
+                  <span style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    color: '#DC2626',
+                    backgroundColor: '#FEE2E2',
+                    padding: '0.1rem 0.4rem',
+                    borderRadius: '4px'
+                  }}>
+                    {overdueTasksCount} Overdue
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
                 {pendingTasksCount === 1 ? '1 pending task' : `${pendingTasksCount} pending tasks`}
@@ -638,39 +707,61 @@ export const Home = () => {
                   Key Action Items
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.5rem' }}>
-                  {briefingData.priorities.map((task) => (
-                    <div 
-                      key={task.id}
-                      onClick={() => navigate('/tasks')}
-                      style={{
-                        padding: '0.65rem 0.85rem',
-                        borderRadius: 'var(--radius-sm)',
-                        backgroundColor: 'var(--warm-bg)',
-                        border: '1px solid var(--border-color)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        cursor: 'pointer',
-                        transition: 'var(--transition)'
-                      }}
-                      className="note-mention-card"
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
-                        <CheckSquare size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-                        <span style={{ 
-                          fontSize: '0.8rem', 
-                          fontWeight: 500, 
-                          color: 'var(--text-primary)',
-                          whiteSpace: 'nowrap',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          {task.description}
-                        </span>
+                  {briefingData.priorities.map((task) => {
+                    const isTaskOverdue = task.due_date && new Date(task.due_date) < new Date();
+                    return (
+                      <div 
+                        key={task.id}
+                        onClick={() => navigate('/tasks')}
+                        style={{
+                          padding: '0.65rem 0.85rem',
+                          borderRadius: 'var(--radius-sm)',
+                          backgroundColor: isTaskOverdue ? '#FFF5F5' : 'var(--warm-bg)',
+                          border: isTaskOverdue ? '1px solid #FECACA' : '1px solid var(--border-color)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer',
+                          transition: 'var(--transition)'
+                        }}
+                        className="note-mention-card"
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', overflow: 'hidden' }}>
+                          {isTaskOverdue ? (
+                            <AlertTriangle size={14} style={{ color: '#DC2626', flexShrink: 0 }} />
+                          ) : (
+                            <CheckSquare size={14} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
+                          )}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
+                            {isTaskOverdue && (
+                              <span style={{
+                                fontSize: '0.65rem',
+                                fontWeight: 700,
+                                color: '#DC2626',
+                                backgroundColor: '#FEE2E2',
+                                padding: '0.05rem 0.3rem',
+                                borderRadius: '3px',
+                                flexShrink: 0
+                              }}>
+                                OVERDUE
+                              </span>
+                            )}
+                            <span style={{ 
+                              fontSize: '0.8rem', 
+                              fontWeight: isTaskOverdue ? 600 : 500, 
+                              color: isTaskOverdue ? '#991B1B' : 'var(--text-primary)',
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis'
+                            }}>
+                              {task.description}
+                            </span>
+                          </div>
+                        </div>
+                        <ArrowRight size={12} style={{ color: isTaskOverdue ? '#DC2626' : 'var(--text-secondary)', flexShrink: 0, marginLeft: '0.25rem' }} />
                       </div>
-                      <ArrowRight size={12} style={{ color: 'var(--text-secondary)', flexShrink: 0, marginLeft: '0.25rem' }} />
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

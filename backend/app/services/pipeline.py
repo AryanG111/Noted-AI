@@ -59,6 +59,19 @@ def update_contact_context(context: Optional[str], old_title: Optional[str], new
     all_lines = other_lines + formatted_mention_lines
     return "\n".join(all_lines) if all_lines else None
 
+def infer_entity_type_and_role(name: str) -> tuple[str, str]:
+    n = name.lower().strip()
+    # Teams / departments / groups
+    if any(k in n for k in ["team", "dept", "department", "squad", "crew", "guild", "committee", "ops", "qa team", "backend team", "dev team", "security team"]):
+        return "team", "Team"
+    # Institutions (schools, colleges, universities, hospitals, foundations)
+    if any(k in n for k in ["university", "college", "school", "institute", "institution", "academy", "hospital", "foundation", "lab", "laboratory"]):
+        return "institution", "Institution"
+    # Organizations / Companies
+    if any(k in n for k in ["inc", "corp", "corporation", "ltd", "llc", "technologies", "solutions", "organization", "agency", "group"]):
+        return "organization", "Organization"
+    return "person", "Contact"
+
 class IngestionPipelineService:
     async def process_note(self, db: Session, note_id: UUID, user_id: UUID, provider: Optional[str] = None) -> Note:
         """
@@ -123,17 +136,16 @@ class IngestionPipelineService:
         db.commit()
         db.refresh(note)
         new_title = note.title
-        
-        # 4. Process Contacts
+        # 4. Process Contacts (People, Teams, Organizations)
         extracted_names = [name.strip() for name in extraction.get("contacts", []) if name.strip()]
         
-        # Filter out user's own name to avoid self-contacts
+        # Filter out user's own name to avoid self-contacts, but never filter teams
         if user and user.full_name:
-            user_name_lower = user.full_name.lower()
-            user_first_name = user.full_name.split()[0].lower() if user.full_name.split() else ""
+            user_name_lower = user.full_name.lower().strip()
+            user_first_name = user.full_name.split()[0].lower().strip() if user.full_name.split() else ""
             extracted_names = [
                 name for name in extracted_names
-                if name.lower() != user_name_lower and name.lower() != user_first_name
+                if name.lower().strip() != user_name_lower and (name.lower().strip() != user_first_name or any(k in name.lower() for k in ["team", "org", "dept", "group"]))
             ]
             
         extracted_names_lower = [name.lower() for name in extracted_names]
@@ -149,6 +161,7 @@ class IngestionPipelineService:
         
         contact_ids_map = {}
         for name in extracted_names:
+            ent_type, def_role = infer_entity_type_and_role(name)
             # Check if contact already exists for this user
             contact = db.query(Contact).filter(
                 Contact.user_id == user_id,
@@ -159,7 +172,8 @@ class IngestionPipelineService:
                 contact = Contact(
                     user_id=user_id,
                     name=name,
-                    role="Contact",
+                    role=def_role,
+                    entity_type=ent_type,
                     context=update_contact_context(None, old_title, new_title, is_mentioned=True)
                 )
                 db.add(contact)
@@ -167,6 +181,8 @@ class IngestionPipelineService:
                 db.refresh(contact)
             else:
                 contact.last_interaction = datetime.datetime.now()
+                if not contact.entity_type or contact.entity_type == "person":
+                    contact.entity_type = ent_type
                 contact.context = update_contact_context(contact.context, old_title, new_title, is_mentioned=True)
                 db.add(contact)
                 db.commit()

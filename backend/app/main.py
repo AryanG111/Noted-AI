@@ -28,6 +28,8 @@ try:
     with engine.connect() as conn:
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS status VARCHAR DEFAULT 'approved'"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR DEFAULT 'user'"))
+        conn.execute(text("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS entity_type VARCHAR DEFAULT 'person'"))
+        conn.execute(text("ALTER TABLE contacts ADD COLUMN IF NOT EXISTS organization VARCHAR"))
         # Ensure existing users are approved so service isn't disrupted
         conn.execute(text("UPDATE users SET status = 'approved' WHERE status IS NULL OR status = 'pending'"))
         # Ensure the first user is granted admin if no admin exists

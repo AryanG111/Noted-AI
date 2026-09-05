@@ -6,6 +6,8 @@ from typing import Optional
 class ContactBase(BaseModel):
     name: str = Field(..., min_length=1, max_length=150)
     role: Optional[str] = Field(None, max_length=150)
+    entity_type: Optional[str] = Field("person", max_length=50)  # person, team, organization, institution
+    organization: Optional[str] = Field(None, max_length=150)
     context: Optional[str] = Field(None, max_length=5000)
 
 class ContactCreate(ContactBase):
@@ -14,6 +16,8 @@ class ContactCreate(ContactBase):
 class ContactUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=150)
     role: Optional[str] = Field(None, max_length=150)
+    entity_type: Optional[str] = Field(None, max_length=50)
+    organization: Optional[str] = Field(None, max_length=150)
     context: Optional[str] = Field(None, max_length=5000)
     last_interaction: Optional[datetime] = None
 

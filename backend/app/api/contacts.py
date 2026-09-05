@@ -52,6 +52,10 @@ def update_contact(
         contact.name = contact_in.name
     if contact_in.role is not None:
         contact.role = contact_in.role
+    if contact_in.entity_type is not None:
+        contact.entity_type = contact_in.entity_type
+    if contact_in.organization is not None:
+        contact.organization = contact_in.organization
     if contact_in.context is not None:
         contact.context = contact_in.context
     if contact_in.last_interaction is not None:

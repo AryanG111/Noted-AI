@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth, API_URL, handleApiResponse } from '../context/AuthContext';
 import { EmptyContactsDoodle } from '../components/DoodleIllustrations';
-import { User, FileText, CheckSquare, Edit3, Save, Trash2, ArrowLeft } from 'lucide-react';
+import { User, Users, Building, GraduationCap, FileText, CheckSquare, Edit3, Save, Trash2, ArrowLeft } from 'lucide-react';
 
 export const Contacts = () => {
   const { token } = useAuth();
@@ -11,7 +11,10 @@ export const Contacts = () => {
   const [selectedContact, setSelectedContact] = useState(null);
   const [memories, setMemories] = useState({ notes: [], tasks: [] });
   const [role, setRole] = useState('');
+  const [entityType, setEntityType] = useState('person');
+  const [organization, setOrganization] = useState('');
   const [context, setContext] = useState('');
+  const [filterType, setFilterType] = useState('all'); // 'all' | 'person' | 'team_org'
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -49,6 +52,8 @@ export const Contacts = () => {
   const handleSelectContact = async (contact) => {
     setSelectedContact(contact);
     setRole(contact.role || '');
+    setEntityType(contact.entity_type || 'person');
+    setOrganization(contact.organization || '');
     setContext(contact.context || '');
     setIsEditing(false);
     setMobileShowDetails(true);
@@ -79,7 +84,12 @@ export const Contacts = () => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ role, context })
+        body: JSON.stringify({ 
+          role, 
+          entity_type: entityType, 
+          organization, 
+          context 
+        })
       });
       const updated = await handleApiResponse(response, 'Unable to update contact.');
       setSelectedContact(updated);
@@ -121,6 +131,45 @@ export const Contacts = () => {
     }
   };
 
+  const getEntityIconAndStyle = (type) => {
+    switch (type) {
+      case 'team':
+        return {
+          icon: <Users size={16} />,
+          bg: '#F3E8FF',
+          color: '#9333EA',
+          label: 'Team'
+        };
+      case 'organization':
+        return {
+          icon: <Building size={16} />,
+          bg: '#FEF3C7',
+          color: '#D97706',
+          label: 'Organization'
+        };
+      case 'institution':
+        return {
+          icon: <GraduationCap size={16} />,
+          bg: '#DCFCE7',
+          color: '#16A34A',
+          label: 'Institution'
+        };
+      default:
+        return {
+          icon: <User size={16} />,
+          bg: '#E8F0FE',
+          color: 'var(--blue-accent)',
+          label: 'Person'
+        };
+    }
+  };
+
+  const filteredContacts = contacts.filter(c => {
+    if (filterType === 'person') return (c.entity_type || 'person') === 'person';
+    if (filterType === 'team_org') return (c.entity_type || 'person') !== 'person';
+    return true;
+  });
+
   if (loading) {
     return (
       <div style={{ padding: '2rem', color: 'var(--text-secondary)', fontFamily: 'var(--font-sans)' }}>
@@ -129,59 +178,133 @@ export const Contacts = () => {
     );
   }
 
+  const personCount = contacts.filter(c => (c.entity_type || 'person') === 'person').length;
+  const teamOrgCount = contacts.filter(c => (c.entity_type || 'person') !== 'person').length;
+
   return (
     <div className="contacts-container">
       {/* 1. Left Sidebar List */}
       <div className={`contacts-list-panel ${mobileShowDetails ? 'hide-on-mobile' : ''}`}>
-        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)' }}>
-          <h2 style={{ fontSize: '1.2rem', fontWeight: 600 }}>Memory Profiles</h2>
+        <div style={{ padding: '1.25rem 1.25rem 0.75rem', borderBottom: '1px solid var(--border-color)' }}>
+          <h2 style={{ fontSize: '1.15rem', fontWeight: 600, marginBottom: '0.75rem' }}>Memory Profiles</h2>
+          {/* Filter Pills */}
+          <div style={{ display: 'flex', gap: '0.35rem' }}>
+            <button
+              onClick={() => setFilterType('all')}
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                padding: '0.25rem 0.5rem',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid',
+                borderColor: filterType === 'all' ? 'var(--text-primary)' : 'var(--border-color)',
+                backgroundColor: filterType === 'all' ? 'var(--text-primary)' : 'transparent',
+                color: filterType === 'all' ? '#FFFFFF' : 'var(--text-secondary)',
+                cursor: 'pointer'
+              }}
+            >
+              All ({contacts.length})
+            </button>
+            <button
+              onClick={() => setFilterType('person')}
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                padding: '0.25rem 0.5rem',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid',
+                borderColor: filterType === 'person' ? 'var(--blue-accent)' : 'var(--border-color)',
+                backgroundColor: filterType === 'person' ? '#E8F0FE' : 'transparent',
+                color: filterType === 'person' ? 'var(--blue-accent)' : 'var(--text-secondary)',
+                cursor: 'pointer'
+              }}
+            >
+              People ({personCount})
+            </button>
+            <button
+              onClick={() => setFilterType('team_org')}
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                padding: '0.25rem 0.5rem',
+                borderRadius: 'var(--radius-sm)',
+                border: '1px solid',
+                borderColor: filterType === 'team_org' ? '#9333EA' : 'var(--border-color)',
+                backgroundColor: filterType === 'team_org' ? '#F3E8FF' : 'transparent',
+                color: filterType === 'team_org' ? '#9333EA' : 'var(--text-secondary)',
+                cursor: 'pointer'
+              }}
+            >
+              Teams & Orgs ({teamOrgCount})
+            </button>
+          </div>
         </div>
         <div style={{ flexGrow: 1, overflowY: 'auto', padding: '0.75rem' }}>
-          {contacts.length === 0 ? (
+          {filteredContacts.length === 0 ? (
             <p style={{ textAlign: 'center', color: 'var(--text-secondary)', fontSize: '0.85rem', marginTop: '2rem' }}>
-              No contacts saved yet.
+              {contacts.length === 0 ? 'No contacts saved yet.' : 'No profiles match this filter.'}
             </p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-              {contacts.map(c => (
-                <div
-                  key={c.id}
-                  onClick={() => handleSelectContact(c)}
-                  style={{
-                    padding: '0.75rem 1rem',
-                    borderRadius: 'var(--radius-md)',
-                    border: '1px solid',
-                    borderColor: selectedContact?.id === c.id ? '#D1D5DB' : 'transparent',
-                    backgroundColor: selectedContact?.id === c.id ? '#FFFFFF' : 'transparent',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.75rem',
-                    transition: 'var(--transition)'
-                  }}
-                >
-                  <div style={{
-                    width: '32px',
-                    height: '32px',
-                    borderRadius: '50%',
-                    backgroundColor: '#E8F0FE',
-                    color: 'var(--blue-accent)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <User size={16} />
-                  </div>
-                  <div style={{ overflow: 'hidden' }}>
-                    <div style={{ fontSize: '0.875rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {c.name}
+              {filteredContacts.map(c => {
+                const styleInfo = getEntityIconAndStyle(c.entity_type || 'person');
+                return (
+                  <div
+                    key={c.id}
+                    onClick={() => handleSelectContact(c)}
+                    style={{
+                      padding: '0.75rem 1rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: '1px solid',
+                      borderColor: selectedContact?.id === c.id ? '#D1D5DB' : 'transparent',
+                      backgroundColor: selectedContact?.id === c.id ? '#FFFFFF' : 'transparent',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.75rem',
+                      transition: 'var(--transition)'
+                    }}
+                  >
+                    <div style={{
+                      width: '32px',
+                      height: '32px',
+                      borderRadius: '50%',
+                      backgroundColor: styleInfo.bg,
+                      color: styleInfo.color,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0
+                    }}>
+                      {styleInfo.icon}
                     </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {c.role || 'Contact'}
+                    <div style={{ overflow: 'hidden', flexGrow: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', overflow: 'hidden' }}>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {c.name}
+                        </span>
+                        {c.entity_type && c.entity_type !== 'person' && (
+                          <span style={{ 
+                            fontSize: '0.65rem', 
+                            padding: '0.1rem 0.35rem', 
+                            borderRadius: '4px', 
+                            backgroundColor: styleInfo.bg, 
+                            color: styleInfo.color, 
+                            fontWeight: 600,
+                            textTransform: 'uppercase'
+                          }}>
+                            {styleInfo.label}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {c.role || (c.entity_type === 'team' ? 'Team' : 'Contact')}
+                        {c.organization ? ` • ${c.organization}` : ''}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -231,44 +354,90 @@ export const Contacts = () => {
         {selectedContact ? (
           <div style={{ maxWidth: '840px', width: '100%' }}>
             {/* Header */}
-            <div className="contacts-profile-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', minWidth: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '2rem' }}>
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'flex-start' }}>
                 <div style={{
-                  width: '52px',
-                  height: '52px',
-                  borderRadius: '50%',
-                  backgroundColor: '#E8F0FE',
-                  color: 'var(--blue-accent)',
+                  width: '56px',
+                  height: '56px',
+                  borderRadius: '16px',
+                  backgroundColor: getEntityIconAndStyle(selectedContact.entity_type || 'person').bg,
+                  color: getEntityIconAndStyle(selectedContact.entity_type || 'person').color,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0
                 }}>
-                  <User size={26} />
+                  {React.cloneElement(getEntityIconAndStyle(selectedContact.entity_type || 'person').icon, { size: 28 })}
                 </div>
                 <div>
-                  <h1 style={{ fontSize: '1.65rem', fontWeight: 700, letterSpacing: '-0.02em', color: 'var(--text-primary)', margin: 0 }}>
-                    {selectedContact.name}
-                  </h1>
-                  {isEditing ? (
-                    <input
-                      type="text"
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                      placeholder="e.g. Founder, Architect"
-                      style={{
-                        fontSize: '0.875rem',
-                        padding: '0.25rem 0.5rem',
-                        borderRadius: 'var(--radius-sm)',
-                        border: '1px solid var(--border-color)',
-                        outline: 'none',
-                        marginTop: '0.25rem'
-                      }}
-                    />
-                  ) : (
-                    <span style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                      {selectedContact.role || 'No role assigned'}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                    <h1 style={{ fontSize: '1.75rem', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>
+                      {selectedContact.name}
+                    </h1>
+                    <span style={{
+                      fontSize: '0.75rem',
+                      padding: '0.15rem 0.5rem',
+                      borderRadius: '6px',
+                      backgroundColor: getEntityIconAndStyle(selectedContact.entity_type || 'person').bg,
+                      color: getEntityIconAndStyle(selectedContact.entity_type || 'person').color,
+                      fontWeight: 600,
+                      textTransform: 'uppercase'
+                    }}>
+                      {getEntityIconAndStyle(selectedContact.entity_type || 'person').label}
                     </span>
+                  </div>
+
+                  {isEditing ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        <select
+                          value={entityType}
+                          onChange={(e) => setEntityType(e.target.value)}
+                          style={{
+                            padding: '0.35rem 0.6rem',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--border-color)',
+                            fontSize: '0.85rem',
+                            background: '#FFFFFF'
+                          }}
+                        >
+                          <option value="person">Person</option>
+                          <option value="team">Team / Department</option>
+                          <option value="organization">Organization / Company</option>
+                          <option value="institution">School / College / Institution</option>
+                        </select>
+                        <input
+                          type="text"
+                          value={role}
+                          onChange={(e) => setRole(e.target.value)}
+                          placeholder="Role / Function"
+                          style={{
+                            padding: '0.35rem 0.6rem',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid var(--border-color)',
+                            fontSize: '0.85rem'
+                          }}
+                        />
+                      </div>
+                      <input
+                        type="text"
+                        value={organization}
+                        onChange={(e) => setOrganization(e.target.value)}
+                        placeholder="Organization / Company / School (optional)"
+                        style={{
+                          padding: '0.35rem 0.6rem',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--border-color)',
+                          fontSize: '0.85rem',
+                          maxWidth: '300px'
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <p style={{ fontSize: '0.95rem', color: 'var(--text-secondary)', margin: 0 }}>
+                      {selectedContact.role || (selectedContact.entity_type === 'team' ? 'Team' : 'Contact')}
+                      {selectedContact.organization ? ` • ${selectedContact.organization}` : ''}
+                    </p>
                   )}
                 </div>
               </div>
@@ -276,59 +445,31 @@ export const Contacts = () => {
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 {isEditing ? (
                   <button 
-                    onClick={saveContactUpdates} 
-                    disabled={saving || deleting} 
                     className="btn btn-primary" 
-                    style={{ padding: '0.5rem 1rem' }}
+                    onClick={saveContactUpdates} 
+                    disabled={saving}
+                    style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
                   >
-                    {saving ? (
-                      <span className="spinner" style={{
-                        width: '12px',
-                        height: '12px',
-                        border: '2px solid white',
-                        borderTopColor: 'transparent',
-                        marginRight: '0.25rem'
-                      }} />
-                    ) : (
-                      <Save size={14} />
-                    )}
-                    <span>{saving ? 'Saving...' : 'Save'}</span>
+                    <Save size={14} />
+                    <span>{saving ? 'Saving...' : 'Save Profile'}</span>
                   </button>
                 ) : (
                   <>
                     <button 
-                      onClick={() => setIsEditing(true)} 
-                      disabled={deleting} 
                       className="btn btn-secondary" 
-                      style={{ padding: '0.5rem 1rem' }}
+                      onClick={() => setIsEditing(true)}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.8rem', fontSize: '0.85rem' }}
                     >
                       <Edit3 size={14} />
-                      <span>Edit Profile</span>
+                      <span>Edit</span>
                     </button>
                     <button 
-                      onClick={handleDeleteContact} 
-                      disabled={deleting} 
-                      className="btn" 
-                      style={{ 
-                        padding: '0.5rem 1rem', 
-                        backgroundColor: 'var(--red-accent)', 
-                        color: 'white',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
+                      className="btn btn-secondary" 
+                      onClick={handleDeleteContact}
+                      disabled={deleting}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', padding: '0.4rem 0.8rem', fontSize: '0.85rem', color: 'var(--red-accent)', borderColor: '#FAD2CF' }}
                     >
-                      {deleting ? (
-                        <span className="spinner" style={{
-                          width: '12px',
-                          height: '12px',
-                          border: '2px solid white',
-                          borderTopColor: 'transparent',
-                          marginRight: '0.25rem'
-                        }} />
-                      ) : (
-                        <Trash2 size={14} />
-                      )}
+                      <Trash2 size={14} />
                       <span>{deleting ? 'Deleting...' : 'Delete'}</span>
                     </button>
                   </>
