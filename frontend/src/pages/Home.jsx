@@ -288,6 +288,14 @@ export const Home = () => {
         }
         cleanAnswer = (valid.length > 0 ? valid.join('\n') : cleanAnswer).trim();
       }
+      // Strip internal UUIDs and IDs
+      cleanAnswer = cleanAnswer
+        .replace(/\(?internal_[a-z_]*id:\s*[0-9a-fA-F-]+\)?/gi, '')
+        .replace(/\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/g, '')
+        .replace(/\*\*\s*\*\*/g, '')
+        .replace(/\|\s*Task ID\s*\|/gi, '|')
+        .replace(/\|\s*ID\s*\|/gi, '|');
+
       setChatResponse(cleanAnswer.trim());
       setCitations(data.citations || []);
     } catch (err) {

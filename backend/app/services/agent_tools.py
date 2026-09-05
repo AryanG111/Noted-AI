@@ -36,7 +36,7 @@ def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list, provider: 
                             "id": str(note_id),
                             "title": r.get("title") or "Untitled Note"
                         })
-                out.append(f"[{idx+1}] Note ID: {note_id} | Title: {r.get('title')} | Summary: {r.get('summary')} | Content: {r.get('content')}")
+                out.append(f"[{idx+1}] Title: '{r.get('title')}' | Summary: {r.get('summary')} | Content: {r.get('content')} (internal_note_id: {note_id})")
             return "\n".join(out)
         except Exception as e:
             return f"Search failed: {e}"
@@ -44,8 +44,8 @@ def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list, provider: 
     @tool
     async def get_contacts() -> str:
         """
-        Retrieve the list of all saved contacts in your memory directory, including their IDs, roles, and context logs.
-        Use this to find a contact's ID or verify if they exist before updating or deleting them.
+        Retrieve the list of all saved contacts in your memory directory, including their roles and context logs.
+        Use this to find a contact or verify if they exist before updating or deleting them.
         """
         from backend.app.models.contact import Contact
         contacts = db.query(Contact).filter(Contact.user_id == user_id).all()
@@ -53,7 +53,7 @@ def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list, provider: 
             return "No contacts found in memory."
         out = []
         for c in contacts:
-            out.append(f"- ID: {c.id} | Name: {c.name} | Role: {c.role or 'None'} | Context: {c.context or 'None'}")
+            out.append(f"- Contact: '{c.name}' | Role: {c.role or 'None'} | Context: {c.context or 'None'} (internal_id: {c.id})")
         return "\n".join(out)
 
     @tool
@@ -158,7 +158,7 @@ def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list, provider: 
     async def get_tasks() -> str:
         """
         Retrieve the list of all pending and completed commitments (tasks).
-        Use this to find a task's ID or status before updating or deleting it.
+        Use this to find a task or verify status before updating or deleting it.
         """
         from backend.app.models.task import Task
         tasks = db.query(Task).filter(Task.user_id == user_id).all()
@@ -167,7 +167,7 @@ def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list, provider: 
         out = []
         for t in tasks:
             due_str = t.due_date.strftime("%Y-%m-%d") if t.due_date else "None"
-            out.append(f"- ID: {t.id} | Description: {t.description} | Status: {t.status} | Due: {due_str}")
+            out.append(f"- Task: '{t.description}' | Status: {t.status} | Due: {due_str} (internal_id: {t.id})")
         return "\n".join(out)
 
     @tool
@@ -204,7 +204,7 @@ def get_agent_tools(db: Session, user_id: UUID, accessed_notes: list, provider: 
         db.add(task)
         db.commit()
         db.refresh(task)
-        return f"Successfully created task '{task.description}' with ID: {task.id}."
+        return f"Successfully created task '{task.description}' (internal_id: {task.id})."
 
     @tool
     async def update_task(task_id: str, status: Optional[str] = None, due_date: Optional[str] = None) -> str:

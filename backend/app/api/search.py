@@ -154,28 +154,31 @@ def sanitize_agent_output(text: str) -> str:
     cleaned = re.sub(r'<thought>.*?</thought>', '', text, flags=re.DOTALL | re.IGNORECASE)
     cleaned = re.sub(r'<think>.*?</think>', '', cleaned, flags=re.DOTALL | re.IGNORECASE)
     
-    if cleaned.strip():
-        return cleaned.strip()
+    if not cleaned.strip():
+        # 2. If text was entirely inside an unclosed tag, strip the tags themselves
+        cleaned = re.sub(r'</?(?:thought|think)>', '', text, flags=re.IGNORECASE)
+        lines = cleaned.strip().split('\n')
+        valid_lines = []
+        started = False
+        for line in lines:
+            l_str = line.strip()
+            if not started:
+                if l_str.startswith(('*', '-', '#', '>')) or any(l_str.lower().startswith(p) for p in ['hello', 'hi', 'here', 'i can', 'i am', 'welcome', 'as noted', 'noted ai', 'sure', 'certainly']):
+                    started = True
+                    valid_lines.append(line)
+                continue
+            valid_lines.append(line)
+        cleaned = '\n'.join(valid_lines) if valid_lines else cleaned
         
-    # 2. If text was entirely inside an unclosed tag, strip the tags themselves
-    cleaned = re.sub(r'</?(?:thought|think)>', '', text, flags=re.IGNORECASE)
+    # 3. Strip all internal IDs and raw UUIDs from the output
+    cleaned = re.sub(r'\(?internal_[a-z_]*id:\s*[0-9a-fA-F-]+\)?', '', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b', '', cleaned)
+    # Clean any bold empty markers like ** ** or empty brackets
+    cleaned = re.sub(r'\*\*\s*\*\*', '', cleaned)
+    cleaned = re.sub(r'\(\s*\)', '', cleaned)
+    cleaned = re.sub(r'\|\s*Task ID\s*\|', '|', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'\|\s*ID\s*\|', '|', cleaned, flags=re.IGNORECASE)
     
-    # Filter out initial meta-planning lines if any
-    lines = cleaned.strip().split('\n')
-    valid_lines = []
-    started = False
-    for line in lines:
-        l_str = line.strip()
-        if not started:
-            if l_str.startswith(('*', '-', '#', '>')) or any(l_str.lower().startswith(p) for p in ['hello', 'hi', 'here', 'i can', 'i am', 'welcome', 'as noted', 'noted ai', 'sure', 'certainly']):
-                started = True
-                valid_lines.append(line)
-            continue
-        valid_lines.append(line)
-        
-    if valid_lines:
-        return '\n'.join(valid_lines).strip()
-        
     return cleaned.strip()
 
     # 3. Create prompt template
@@ -188,9 +191,9 @@ def sanitize_agent_output(text: str) -> str:
             "Formatting & Tone Guidelines:\n"
             "- Communicate with high editorial clarity, warmth, and intelligence.\n"
             "- When listing tasks, commitments, notes, or contacts, use clean bullet points with bold highlights and due dates.\n"
+            "- ABSOLUTELY NEVER display or write out raw UUIDs, hex IDs, or internal database IDs in your response. Refer to items purely by title, name, or description.\n"
             "- NEVER output internal thought traces, draft planning notes, reasoning scratchpads, or <thought> / <think> tags. Output only the final user-facing response directly.\n"
-            "- NEVER expose raw internal database UUIDs to the user in conversational answers.\n"
-            "- Keep tables clean and standard, or use readable bullet lists for lists of items."
+            "- Keep formatting sleek, human-friendly, and concise."
         )),
         ("human", "{input}"),
         MessagesPlaceholder("agent_scratchpad"),
