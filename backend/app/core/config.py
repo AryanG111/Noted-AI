@@ -36,6 +36,16 @@ class Settings(BaseSettings):
     GROQ_MODEL: str = "openai/gpt-oss-120b"
     OPENROUTER_MODEL: str = "openai/gpt-4o"
     
+    # SMTP / Email Settings
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM: str = "aryan.ghait@shakham.com"
+    SMTP_TLS: bool = True
+    SMTP_SSL: bool = False
+    FRONTEND_URL: str = "http://13.51.157.228"
+    
     class Config:
         env_file = ".env"
         case_sensitive = True

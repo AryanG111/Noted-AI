@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from uuid import UUID
 
@@ -11,6 +11,7 @@ from backend.app.models.task import Task
 from backend.app.models.contact import Contact
 from backend.app.models.relation import Relationship
 from backend.app.schemas.user import UserResponse, UserStatusUpdate
+from backend.app.services.email import send_account_approved_email
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -34,6 +35,7 @@ def list_users(
 def update_user_status(
     user_id: UUID,
     status_in: UserStatusUpdate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin)
 ):
@@ -55,10 +57,16 @@ def update_user_status(
             detail="You cannot revoke or change your own admin approval status."
         )
 
+    prev_status = user.status
     user.status = new_status
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # If user transitioned to approved, send the Account Approved notification email
+    if new_status == "approved" and prev_status != "approved":
+        background_tasks.add_task(send_account_approved_email, user.email, user.full_name)
+
     return user
 
 @router.delete("/users/{user_id}")

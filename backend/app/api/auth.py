@@ -1,5 +1,5 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import jwt
 from sqlalchemy.orm import Session
@@ -9,6 +9,7 @@ from backend.app.core.db import get_db
 from backend.app.core.security import get_password_hash, verify_password, create_access_token, decode_access_token
 from backend.app.models.user import User
 from backend.app.schemas.user import UserCreate, UserLogin, UserResponse, Token
+from backend.app.services.email import send_welcome_email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -39,7 +40,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     return user
 
 @router.post("/register", response_model=UserResponse)
-def register(user_in: UserCreate, db: Session = Depends(get_db)):
+def register(user_in: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # Check if user already exists
     existing_user = db.query(User).filter(User.email == user_in.email).first()
     if existing_user:
@@ -66,6 +67,10 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     db.add(user)
     db.commit()
     db.refresh(user)
+
+    # Schedule welcome email in background
+    background_tasks.add_task(send_welcome_email, user.email, user.full_name, user.status == "pending")
+
     return user
 
 @router.post("/token", response_model=Token)
