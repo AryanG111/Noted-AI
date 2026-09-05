@@ -25,6 +25,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import LottieAnimation from '../components/LottieAnimation';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import loaderAnimation from '../assets/loader.json';
 import successAnimation from '../assets/success.json';
 import emptyAnimation from '../assets/empty.json';
@@ -884,7 +885,7 @@ export const Home = () => {
             paddingTop: '1.5rem'
           }}>
             <div style={{ fontSize: '0.925rem', lineHeight: '1.6', color: 'var(--text-primary)' }} className="markdown-content">
-              <ReactMarkdown>{chatResponse}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{chatResponse}</ReactMarkdown>
             </div>
 
             {citations.length > 0 && (

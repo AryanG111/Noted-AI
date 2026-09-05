@@ -152,7 +152,11 @@ async def ask_noted(
             "User's Background: {user_background}\n"
             "Preferred Style / Tone: {ai_tone}\n"
             "Current local time is: {current_time} (Use this to resolve relative dates like 'tomorrow', 'next week', 'Friday').\n"
-            "Answer the user's questions clearly, accurately, and helpfully using the available tools when needed."
+            "Formatting & Tone Guidelines:\n"
+            "- Communicate with high editorial clarity, warmth, and intelligence.\n"
+            "- When listing tasks, commitments, notes, or contacts, use clean bullet points with bold highlights and due dates.\n"
+            "- NEVER expose raw internal database UUIDs to the user in conversational answers.\n"
+            "- Keep tables clean and standard, or use readable bullet lists for lists of items."
         )),
         ("human", "{input}"),
         MessagesPlaceholder("agent_scratchpad"),
