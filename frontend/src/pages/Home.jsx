@@ -268,6 +268,7 @@ export const Home = () => {
         body: JSON.stringify({ query: chatQuery.trim() })
       });
       
+      const data = await handleApiResponse(response, 'Unable to process search query.');
       const rawAnswer = data.answer || '';
       let cleanAnswer = rawAnswer.replace(/<thought>[\s\S]*?<\/thought>/gi, '').replace(/<think>[\s\S]*?<\/think>/gi, '');
       if (!cleanAnswer.trim()) {
