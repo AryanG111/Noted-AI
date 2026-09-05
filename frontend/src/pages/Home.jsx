@@ -48,6 +48,7 @@ export const Home = () => {
   // Dashboard states
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [recentTasks, setRecentTasks] = useState([]);
+  const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [notesCount, setNotesCount] = useState(0);
   const [recentNotes, setRecentNotes] = useState([]);
   const [allContacts, setAllContacts] = useState([]);
@@ -120,7 +121,9 @@ export const Home = () => {
       // 1. Process tasks
       if (tasksRes.status === 'fulfilled' && tasksRes.value.ok) {
         const data = await tasksRes.value.json();
-        setRecentTasks(data.filter(t => t.status !== 'done').slice(0, 3));
+        const pending = data.filter(t => t.status !== 'done');
+        setPendingTasksCount(pending.length);
+        setRecentTasks(pending.slice(0, 3));
       }
 
       // 2. Process notes
@@ -403,10 +406,10 @@ export const Home = () => {
           ) : (
             <>
               <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {recentTasks.length}
+                {pendingTasksCount}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.15rem' }}>
-                {recentTasks.length === 1 ? '1 pending task' : `${recentTasks.length} pending tasks`}
+                {pendingTasksCount === 1 ? '1 pending task' : `${pendingTasksCount} pending tasks`}
               </div>
             </>
           )}
@@ -920,7 +923,7 @@ export const Home = () => {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', fontSize: '0.875rem' }}>
               <div>
-                <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{recentTasks.length}</strong>
+                <strong style={{ color: 'var(--text-primary)', fontSize: '1rem' }}>{pendingTasksCount}</strong>
                 <span style={{ color: 'var(--text-secondary)', marginLeft: '0.375rem' }}>commitments</span>
               </div>
               <div>
